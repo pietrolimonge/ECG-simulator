@@ -1,0 +1,3825 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador Vetorial de ECG 12 Derivações — Frontal & Horizontal</title>
+  <!-- Tailwind CSS para layout responsivo e design médico limpo -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fontes Inter e JetBrains Mono para clareza clínica e precisão numérica -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+
+    /* Estilização base dos controles deslizantes (sliders) */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    /* Trilha do slider do Plano Frontal (cores das 4 zonas) */
+    input[type="range"].slider-frontal::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(
+        to right,
+        #fda4af 0%,
+        #fda4af 25%,
+        #fcd34d 25%,
+        #fcd34d 41.6%,
+        #6ee7b7 41.6%,
+        #6ee7b7 75%,
+        #93c5fd 75%,
+        #93c5fd 100%
+      );
+      border: 1px solid #cbd5e1;
+    }
+    input[type="range"].slider-frontal::-moz-range-track {
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(
+        to right,
+        #fda4af 0%,
+        #fda4af 25%,
+        #fcd34d 25%,
+        #fcd34d 41.6%,
+        #6ee7b7 41.6%,
+        #6ee7b7 75%,
+        #93c5fd 75%,
+        #93c5fd 100%
+      );
+      border: 1px solid #cbd5e1;
+    }
+
+    /* Trilha do slider do Plano Horizontal (faixa normal -45° a +15° destacada) */
+    input[type="range"].slider-horizontal::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(
+        to right,
+        #e2e8f0 0%,
+        #e2e8f0 37.5%,
+        #5eead4 37.5%,
+        #5eead4 54.2%,
+        #e2e8f0 54.2%,
+        #e2e8f0 100%
+      );
+      border: 1px solid #cbd5e1;
+    }
+    input[type="range"].slider-horizontal::-moz-range-track {
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(
+        to right,
+        #e2e8f0 0%,
+        #e2e8f0 37.5%,
+        #5eead4 37.5%,
+        #5eead4 54.2%,
+        #e2e8f0 54.2%,
+        #e2e8f0 100%
+      );
+      border: 1px solid #cbd5e1;
+    }
+
+    /* Trilha do slider de Voltagem */
+    input[type="range"].slider-voltage::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      border: 1px solid #cbd5e1;
+    }
+    input[type="range"].slider-voltage::-moz-range-track {
+      height: 6px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      border: 1px solid #cbd5e1;
+    }
+
+    /* Polegares (Thumbs) dos sliders */
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 9999px;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 5px rgba(15, 23, 42, 0.28);
+      margin-top: -7px;
+      transition: transform 0.12s ease;
+    }
+    input[type="range"].slider-frontal::-webkit-slider-thumb {
+      background: #dc2626;
+    }
+    input[type="range"].slider-horizontal::-webkit-slider-thumb {
+      background: #2563eb;
+    }
+    input[type="range"].slider-voltage::-webkit-slider-thumb {
+      background: #0f172a;
+      height: 18px;
+      width: 18px;
+      margin-top: -7px;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      height: 20px;
+      width: 20px;
+      border-radius: 9999px;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 5px rgba(15, 23, 42, 0.28);
+    }
+    input[type="range"].slider-frontal::-moz-range-thumb {
+      background: #dc2626;
+    }
+    input[type="range"].slider-horizontal::-moz-range-thumb {
+      background: #2563eb;
+    }
+    input[type="range"].slider-voltage::-moz-range-thumb {
+      background: #0f172a;
+    }
+
+    /* Previne rolagem acidental durante o arraste dos vetores e compasso em dispositivos touch */
+    .svg-interactive, .caliper-handle {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    @keyframes pulseRing {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 0.42;
+      }
+      50% {
+        transform: scale(1.24);
+        opacity: 0.12;
+      }
+    }
+
+    .vector-halo {
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: pulseRing 2.2s infinite ease-in-out;
+    }
+
+    @media print {
+      header, footer, #presets-section, #planes-section, #ecg-toolbar, #quiz-view, #toast-notification {
+        display: none !important;
+      }
+      body {
+        background: #ffffff;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- Notificação Discreta (Toast) -->
+  <div id="toast-notification" class="fixed bottom-5 right-5 z-50 hidden items-center gap-2 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg border border-slate-700 transition-all">
+    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    <span id="toast-message">Link do cenário copiado!</span>
+  </div>
+
+  <!-- ========================================================================
+       CABEÇALHO SUPERIOR COM APENAS AS DUAS ABAS ESSENCIAIS (EXPLORAR / QUIZ)
+       ======================================================================== -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 via-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" stroke-opacity="0.4"></circle>
+            <ellipse cx="12" cy="12" rx="9" ry="4" stroke-opacity="0.65"></ellipse>
+            <path d="M12 12l5 4" stroke="#fecdd3" stroke-width="2.5"></path>
+            <path d="M12 12l5.5 -2" stroke="#bfdbfe" stroke-width="2.5"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight">
+              Simulador Vetorial de ECG em 12 Derivações
+            </h1>
+            <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+              Frontal + Horizontal
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium tracking-wide">
+            by <span class="text-slate-600 font-semibold">Pietro Limonge</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Navegação Principal: Apenas 2 Abas Essenciais -->
+      <nav aria-label="Modos do Simulador" class="flex items-center gap-1.5 self-start sm:self-auto bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button
+          id="tab-btn-explore"
+          type="button"
+          class="px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-slate-900 shadow-sm"
+        >
+          Explorar
+        </button>
+        <button
+          id="tab-btn-quiz"
+          type="button"
+          class="px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5"
+        >
+          <span>Modo Quiz</span>
+          <span class="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-indigo-100 text-indigo-700">Treino</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       CONTEÚDO PRINCIPAL
+       ======================================================================== -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-5 space-y-5">
+
+    <!-- ======================================================================
+         ABA 1: EXPLORAR (VETORES + PATOLOGIAS + FERRAMENTAS DE LEITURA)
+         ====================================================================== -->
+    <div id="explore-controls-wrapper" class="space-y-5">
+
+      <!-- 1. BARRA DE CENÁRIOS CLÍNICOS & PATOLOGIAS (COM FILTRO DE CATEGORIA E COMPARTILHAMENTO) -->
+      <section id="presets-section" aria-label="Cenários Clínicos e Patologias" class="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-sm space-y-3">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-bold border border-indigo-100">⚡</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600">Biblioteca Clínica:</span>
+            <div id="category-filter-pills" class="flex flex-wrap gap-1.5">
+              <button type="button" data-cat-filter="all" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-white">Todos</button>
+              <button type="button" data-cat-filter="vetores" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Vetores & Sobrecargas</button>
+              <button type="button" data-cat-filter="isquemia" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Isquemia / IAM</button>
+              <button type="button" data-cat-filter="bloqueios" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Bloqueios de Ramo</button>
+              <button type="button" data-cat-filter="arritmias" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Arritmias & BAVs</button>
+              <button type="button" data-cat-filter="eletroliticos" class="cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Eletrolíticos</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 self-start lg:self-auto shrink-0">
+            <button
+              id="btn-share-case"
+              type="button"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center gap-1.5 transition-colors"
+              title="Copiar link direto deste cenário para compartilhar em aulas ou grupos de estudo"
+            >
+              <span>🔗</span>
+              <span>Compartilhar Caso</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="presets-container" class="flex flex-wrap gap-2">
+          <!-- Renderizado dinamicamente conforme a categoria selecionada -->
+        </div>
+      </section>
+
+      <!-- 2. DOIS PAINÉIS INTERATIVOS LADO A LADO: PLANO FRONTAL E PLANO HORIZONTAL (EXATAMENTE COMO NO ORIGINAL) -->
+      <div id="planes-section" class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+
+        <!-- PAINEL ESQUERDO: PLANO FRONTAL (SISTEMA HEXAXIAL DE BAILEY) -->
+        <section class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                  <h2 class="text-base font-bold text-slate-900">Plano Frontal — Sistema Hexaxial</h2>
+                </div>
+                <p class="text-xs text-slate-500">
+                  Arraste o vetor vermelho ou clique em <span class="font-semibold text-slate-700">DI–aVF</span> para ver a linha de <span class="font-mono">90°</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+                <span class="text-[11px] font-medium text-rose-900">Projeção:</span>
+                <span id="frontal-selected-badge" class="text-xs font-bold font-mono text-rose-700">DII (+60°)</span>
+              </div>
+            </div>
+
+            <!-- SVG Círculo Hexaxial -->
+            <div class="w-full max-w-[440px] mx-auto aspect-square my-1">
+              <svg
+                id="frontal-svg"
+                viewBox="0 0 500 500"
+                class="w-full h-full svg-interactive"
+                role="img"
+                aria-label="Círculo interativo do Sistema Hexaxial de Bailey no Plano Frontal"
+              >
+                <defs>
+                  <marker id="arrow-frontal" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+                    <polygon points="0 0, 8 3.5, 0 7" fill="#dc2626" />
+                  </marker>
+                  <filter id="shadow-frontal" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.12" />
+                  </filter>
+                </defs>
+                <g id="frontal-zones"></g>
+                <g id="frontal-grid"></g>
+                <g id="frontal-leads"></g>
+                <g id="frontal-projection"></g>
+                <g id="frontal-vector"></g>
+                <g id="frontal-labels"></g>
+              </svg>
+            </div>
+
+            <!-- Legenda das 4 Zonas Frontais -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px] mb-3">
+              <div class="flex items-center gap-1.5 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200/70">
+                <span class="w-2 h-2 rounded-sm bg-emerald-500 shrink-0"></span>
+                <span class="font-semibold text-emerald-950">Normal (-30°/+90°)</span>
+              </div>
+              <div class="flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200/70">
+                <span class="w-2 h-2 rounded-sm bg-amber-500 shrink-0"></span>
+                <span class="font-semibold text-amber-950">Esq. (-30°/-90°)</span>
+              </div>
+              <div class="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-lg border border-blue-200/70">
+                <span class="w-2 h-2 rounded-sm bg-blue-500 shrink-0"></span>
+                <span class="font-semibold text-blue-950">Dir. (+90°/+180°)</span>
+              </div>
+              <div class="flex items-center gap-1.5 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200/70">
+                <span class="w-2 h-2 rounded-sm bg-rose-500 shrink-0"></span>
+                <span class="font-semibold text-rose-950">Extremo (-90°/-180°)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controles do Plano Frontal (Ângulo Frontal + Voltagem Global do QRS) -->
+          <div id="frontal-controls-bar" class="pt-3 border-t border-slate-200 space-y-3">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div class="flex-1">
+                <div class="flex justify-between text-[10px] font-mono text-slate-400 mb-0.5">
+                  <span>-180°</span>
+                  <span>-90°</span>
+                  <span>0°</span>
+                  <span>+90°</span>
+                  <span>+180°</span>
+                </div>
+                <input
+                  id="frontal-slider"
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value="50"
+                  aria-label="Ângulo do vetor QRS no plano frontal"
+                  class="w-full slider-frontal"
+                />
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-1.5 shrink-0">
+                <button id="btn-frontal-dec" type="button" title="Diminuir 1°" class="w-8 h-8 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">−</button>
+                <div class="relative flex items-center">
+                  <input
+                    id="frontal-input"
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="1"
+                    value="50"
+                    aria-label="Ângulo frontal em graus"
+                    class="w-20 h-8 pl-2 pr-5 rounded-lg border border-slate-300 font-mono font-bold text-xs text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <span class="absolute right-2 text-slate-400 font-mono font-bold text-xs pointer-events-none">°</span>
+                </div>
+                <button id="btn-frontal-inc" type="button" title="Aumentar 1°" class="w-8 h-8 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">+</button>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/80">
+              <label for="voltage-slider" class="text-xs font-semibold text-slate-700 shrink-0">
+                Voltagem QRS:
+              </label>
+              <input
+                id="voltage-slider"
+                type="range"
+                min="0.5"
+                max="1.8"
+                step="0.1"
+                value="1.0"
+                class="flex-1 slider-voltage"
+              />
+              <span id="voltage-display" class="px-2 py-0.5 rounded-md bg-slate-900 text-white font-mono text-xs font-bold shrink-0">
+                1.0x
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAINEL DIREITO: PLANO HORIZONTAL / TRANSVERSAL (PRECORDIAIS V1–V6) -->
+        <section class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                  <h2 class="text-base font-bold text-slate-900">Plano Horizontal — Precordiais (V1–V6)</h2>
+                </div>
+                <p class="text-xs text-slate-500">
+                  Corte transversal do tórax · Arraste o vetor azul ou clique em <span class="font-semibold text-slate-700">V1–V6</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-1.5 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">
+                <span class="text-[11px] font-medium text-blue-900">Projeção:</span>
+                <span id="horizontal-selected-badge" class="text-xs font-bold font-mono text-blue-700">V4 (+60°)</span>
+              </div>
+            </div>
+
+            <!-- SVG Corte Anatômico Transversal do Tórax + Eletrodos V1-V6 -->
+            <div class="w-full max-w-[440px] mx-auto aspect-square my-1">
+              <svg
+                id="horizontal-svg"
+                viewBox="0 0 500 500"
+                class="w-full h-full svg-interactive"
+                role="img"
+                aria-label="Corte anatômico transversal do tórax mostrando eletrodos V1 a V6 e vetor QRS horizontal"
+              >
+                <defs>
+                  <marker id="arrow-horizontal" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+                    <polygon points="0 0, 8 3.5, 0 7" fill="#2563eb" />
+                  </marker>
+                  <filter id="shadow-horizontal" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.12" />
+                  </filter>
+                </defs>
+                <g id="horizontal-zones"></g>
+                <g id="horizontal-anatomy"></g>
+                <g id="horizontal-leads"></g>
+                <g id="horizontal-projection"></g>
+                <g id="horizontal-vector"></g>
+                <g id="horizontal-labels"></g>
+              </svg>
+            </div>
+
+            <!-- Legenda das Referências Horizontais -->
+            <div class="grid grid-cols-3 gap-1.5 text-[10px] mb-3">
+              <div class="flex items-center gap-1.5 bg-teal-50 px-2 py-1 rounded-lg border border-teal-200/70">
+                <span class="w-2 h-2 rounded-sm bg-teal-500 shrink-0"></span>
+                <span class="font-semibold text-teal-950">Normal (-45° a +15°)</span>
+              </div>
+              <div class="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                <span class="w-2 h-2 rounded-full bg-rose-400 shrink-0"></span>
+                <span class="font-semibold text-slate-700">VD: Anterior-Dir.</span>
+              </div>
+              <div class="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                <span class="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                <span class="font-semibold text-slate-700">VE: Posterior-Esq.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controles do Plano Horizontal -->
+          <div id="horizontal-controls-bar" class="pt-3 border-t border-slate-200 space-y-3">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div class="flex-1">
+                <div class="flex justify-between text-[10px] font-mono text-slate-400 mb-0.5">
+                  <span>-180°</span>
+                  <span>-90° (Post)</span>
+                  <span>0° (V6)</span>
+                  <span>+90° (Ant)</span>
+                  <span>+180°</span>
+                </div>
+                <input
+                  id="horizontal-slider"
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value="-20"
+                  aria-label="Ângulo do vetor QRS no plano horizontal"
+                  class="w-full slider-horizontal"
+                />
+              </div>
+              <div class="flex items-center justify-between sm:justify-end gap-1.5 shrink-0">
+                <button id="btn-horiz-dec" type="button" title="Diminuir 1°" class="w-8 h-8 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">−</button>
+                <div class="relative flex items-center">
+                  <input
+                    id="horizontal-input"
+                    type="number"
+                    min="-180"
+                    max="180"
+                    step="1"
+                    value="-20"
+                    aria-label="Ângulo horizontal em graus"
+                    class="w-20 h-8 pl-2 pr-5 rounded-lg border border-slate-300 font-mono font-bold text-xs text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span class="absolute right-2 text-slate-400 font-mono font-bold text-xs pointer-events-none">°</span>
+                </div>
+                <button id="btn-horiz-inc" type="button" title="Aumentar 1°" class="w-8 h-8 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 font-bold text-slate-700">+</button>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 bg-blue-50/70 px-3 py-2 rounded-xl border border-blue-200/70 text-xs">
+              <span class="font-semibold text-blue-950">Zona de Transição (R ≈ S):</span>
+              <span id="quick-transition-badge" class="px-2.5 py-0.5 rounded-md bg-blue-600 text-white font-bold text-[11px]">
+                Normal (V3–V4)
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 3. PAINEL DE DIAGNÓSTICO AUTOMÁTICO EM TEMPO REAL -->
+      <section id="diagnostic-section" aria-label="Diagnóstico Automático em Tempo Real" class="space-y-4">
+        <!-- Banner de Patologia Específica (exibido quando um cenário de IAM, Bloqueio, Arritmia ou Eletrolítico está selecionado) -->
+        <div id="pathology-summary-banner" class="hidden bg-white rounded-2xl border-2 border-indigo-200 p-5 shadow-sm">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div>
+              <span id="path-banner-cat" class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-600 text-white mb-1">
+                Patologia Clínica
+              </span>
+              <h3 id="path-banner-title" class="text-lg font-extrabold text-slate-900"></h3>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+              <span id="path-banner-hr" class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 font-bold text-slate-800"></span>
+              <span id="path-banner-wall" class="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 font-bold text-rose-800"></span>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 text-xs text-slate-700 leading-relaxed">
+            <div>
+              <h4 class="font-bold uppercase tracking-wider text-slate-500 mb-1">Critérios Eletrocardiográficos</h4>
+              <p id="path-banner-ecg"></p>
+            </div>
+            <div>
+              <h4 class="font-bold uppercase tracking-wider text-slate-500 mb-1">Correlação Anatômica & Conduta</h4>
+              <p id="path-banner-clinical"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnóstico Vetorial Frontal & Horizontal -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Coluna Esquerda: Diagnóstico do Plano Frontal -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div id="frontal-diag-card" class="rounded-xl p-4 border transition-colors bg-emerald-50 border-emerald-200">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span id="frontal-diag-pill" class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-600 text-white mb-1">
+                    Plano Frontal · Fisiológico
+                  </span>
+                  <h3 id="frontal-diag-title" class="text-lg font-extrabold text-emerald-950">
+                    Eixo Elétrico Normal
+                  </h3>
+                  <p id="frontal-diag-range" class="text-xs font-medium text-emerald-800 mt-0.5">
+                    Referência: -30° a +90°
+                  </p>
+                </div>
+                <div class="text-right shrink-0 bg-white/90 px-3 py-1.5 rounded-xl border border-black/5 shadow-sm">
+                  <span class="block text-[10px] font-bold uppercase text-slate-400">Eixo Frontal</span>
+                  <span id="frontal-diag-angle" class="text-xl font-extrabold font-mono text-rose-600">+50°</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Algoritmo Prático (DI → aVF → DII)
+              </h4>
+
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                <span class="w-5 h-5 rounded-md bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                <div class="flex-1 text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-900">DI (0°)</span>
+                    <span id="diag-d1-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">POSITIVO</span>
+                  </div>
+                  <p id="diag-d1-text" class="text-slate-600 mt-0.5"></p>
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                <span class="w-5 h-5 rounded-md bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                <div class="flex-1 text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-900">aVF (+90°)</span>
+                    <span id="diag-avf-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">POSITIVO</span>
+                  </div>
+                  <p id="diag-avf-text" class="text-slate-600 mt-0.5"></p>
+                </div>
+              </div>
+
+              <div id="diag-d2-box" class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+                <span class="w-5 h-5 rounded-md bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                <div class="flex-1 text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-slate-900">DII (+60°)</span>
+                    <span id="diag-d2-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">POSITIVO</span>
+                  </div>
+                  <p id="diag-d2-text" class="text-slate-600 mt-0.5"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Correlação Clínica Frontal</h4>
+              <p id="frontal-clinical-note" class="text-xs text-slate-700 leading-relaxed"></p>
+            </div>
+          </div>
+
+          <!-- Coluna Direita: Diagnóstico do Plano Horizontal (Precordiais V1–V6) -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div id="horiz-diag-card" class="rounded-xl p-4 border transition-colors bg-teal-50 border-teal-200">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span id="horiz-diag-pill" class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-teal-600 text-white mb-1">
+                    Plano Horizontal · Precordiais
+                  </span>
+                  <h3 id="horiz-diag-title" class="text-lg font-extrabold text-teal-950">
+                    Zona de Transição Normal (V3–V4)
+                  </h3>
+                  <p id="horiz-diag-range" class="text-xs font-medium text-teal-800 mt-0.5">
+                    Orientação fisiológica: -45° a +15° (posterior e esquerda)
+                  </p>
+                </div>
+                <div class="text-right shrink-0 bg-white/90 px-3 py-1.5 rounded-xl border border-black/5 shadow-sm">
+                  <span class="block text-[10px] font-bold uppercase text-slate-400">Eixo Horiz.</span>
+                  <span id="horiz-diag-angle" class="text-xl font-extrabold font-mono text-blue-600">-20°</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alerta de Onda R Dominante em V1 (R > S) -->
+            <div id="v1-dominant-alert" class="hidden rounded-xl p-3.5 bg-rose-50 border-2 border-rose-300 flex items-start gap-3">
+              <span class="text-lg leading-none mt-0.5">⚠️</span>
+              <div class="text-xs text-rose-950 space-y-1">
+                <p class="font-extrabold text-rose-900 uppercase tracking-wide">
+                  Alerta Clínico: Onda R Dominante em V1 (R &gt; S)
+                </p>
+                <p class="leading-relaxed">
+                  No adulto normal, V1 apresenta padrão <strong>rS</strong> (S profunda). Onda R dominante em V1 indica vetor apontando para a frente/direita: investigar <strong>Sobrecarga Ventricular Direita (HVD)</strong>, <strong>Infarto Dorsal/Lateral antigo</strong>, <strong>Bloqueio de Ramo Direito</strong> ou <strong>Pré-excitação (WPW)</strong>.
+                </p>
+              </div>
+            </div>
+
+            <!-- Alerta de Critério de Voltagem Sokolow-Lyon (HVE) -->
+            <div id="sokolow-alert" class="hidden rounded-xl p-3 bg-amber-50 border border-amber-300 flex items-start gap-2.5">
+              <span class="text-base leading-none mt-0.5">📈</span>
+              <div class="text-xs text-amber-950">
+                <span class="font-bold">Critério de Sokolow-Lyon Positivo:</span>
+                <span id="sokolow-text">S(V1) + R(V5/V6) &gt; 35 mm, compatível com sobrecarga ventricular esquerda.</span>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Progressão Fisiológica da Onda R (V1 → V6)
+              </h4>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed space-y-1.5">
+                <p id="r-progression-summary"></p>
+                <div id="v1-v6-mini-strip" class="grid grid-cols-6 gap-1.5 pt-1.5"></div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100">
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Correlação Clínica Precordial</h4>
+              <p id="horiz-clinical-note" class="text-xs text-slate-700 leading-relaxed"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================================
+         ABA 2: MODO QUIZ (CONFIGURADOR PRÉ-QUIZ + QUESTÃO SEM SPOILERS)
+         ====================================================================== -->
+    <section id="quiz-view" class="hidden space-y-5">
+
+      <!-- ETAPA A: TELA DE CONFIGURAÇÃO ANTES DE COMEÇAR O QUIZ -->
+      <div id="quiz-setup-screen" class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-7 shadow-sm max-w-4xl mx-auto space-y-6">
+        <div class="border-b border-slate-100 pb-4">
+          <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 mb-1.5">
+            Configuração de Treino Clínico
+          </span>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900">
+            Personalize seu Simulado de ECG
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-600 mt-1">
+            Escolha o nível acadêmico, as categorias de patologias e quais etapas de raciocínio médico deseja responder. Durante o quiz, apenas o traçado eletrocardiográfico será exibido para interpretação.
+          </p>
+        </div>
+
+        <!-- 1. Nível Acadêmico (Trilha D1) -->
+        <div class="space-y-2.5">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            1. Nível Acadêmico
+          </label>
+          <div id="quiz-level-selector" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <button type="button" data-level="all" class="q-level-btn px-3.5 py-2.5 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-indigo-950 text-xs font-bold text-left transition-all">
+              Todos os Níveis
+              <span class="block text-[11px] font-normal text-indigo-700 mt-0.5">Banco completo</span>
+            </button>
+            <button type="button" data-level="basico" class="q-level-btn px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-800 text-xs font-bold text-left transition-all">
+              Ciclo Básico
+              <span class="block text-[11px] font-normal text-slate-500 mt-0.5">Eixos e sobrecargas</span>
+            </button>
+            <button type="button" data-level="clinico" class="q-level-btn px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-800 text-xs font-bold text-left transition-all">
+              Ciclo Clínico
+              <span class="block text-[11px] font-normal text-slate-500 mt-0.5">Bloqueios e eletrolíticos</span>
+            </button>
+            <button type="button" data-level="internato" class="q-level-btn px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-800 text-xs font-bold text-left transition-all">
+              Internato / Plantão
+              <span class="block text-[11px] font-normal text-slate-500 mt-0.5">IAMCSST e arritmias</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Categorias de Questões (Bloco B) -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+              2. Categorias de Questões
+            </label>
+            <button id="btn-toggle-all-cats" type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+              Marcar / Desmarcar todas
+            </button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer">
+              <input type="checkbox" value="vetores" checked class="q-cat-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Vetores & Sobrecargas</span>
+                <span class="text-slate-500">Eixos, HVE, HVD, BDAS, rotações</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer">
+              <input type="checkbox" value="isquemia" checked class="q-cat-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Isquemia & Infarto</span>
+                <span class="text-slate-500">IAMCSST paredes e imagem em espelho</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer">
+              <input type="checkbox" value="bloqueios" checked class="q-cat-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Bloqueios de Ramo</span>
+                <span class="text-slate-500">BRD e BRE completos</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer">
+              <input type="checkbox" value="arritmias" checked class="q-cat-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Arritmias & BAVs</span>
+                <span class="text-slate-500">FA, Flutter, TSV, TV, BAVs 1º/2º/3º</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer">
+              <input type="checkbox" value="eletroliticos" checked class="q-cat-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Distúrbios Eletrolíticos</span>
+                <span class="text-slate-500">Hipercalemia e Hipocalemia</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. Etapas da Questão (Bloco C - Seleção de Etapas) -->
+        <div class="space-y-2.5">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            3. Etapas do Caso (Múltipla Escolha)
+          </label>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <label class="flex items-start gap-2.5 p-3.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 cursor-pointer shadow-xs">
+              <input id="chk-stage-anamnesis" type="checkbox" checked class="q-stage-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Etapa 1: Anamnese & Laudo</span>
+                <span class="text-slate-500 mt-0.5 block">Exibe vinheta clínica com sinais vitais e pergunta sobre ritmo/FC/eixo.</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 cursor-pointer shadow-xs">
+              <input id="chk-stage-diagnosis" type="checkbox" checked class="q-stage-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Etapa 2: Diagnóstico do ECG</span>
+                <span class="text-slate-500 mt-0.5 block">Identificação da alteração ou síndrome eletrocardiográfica principal.</span>
+              </div>
+            </label>
+            <label class="flex items-start gap-2.5 p-3.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 cursor-pointer shadow-xs">
+              <input id="chk-stage-conduct" type="checkbox" checked class="q-stage-checkbox mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <div class="text-xs">
+                <span class="font-bold text-slate-900 block">Etapa 3: Conduta Médica</span>
+                <span class="text-slate-500 mt-0.5 block">Decisão terapêutica imediata diante do quadro clínico e traçado.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="quiz-setup-error" class="hidden text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-3.5 py-2.5 rounded-xl">
+          Selecione pelo menos uma categoria e uma etapa para iniciar o quiz.
+        </div>
+
+        <div class="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+          <span id="quiz-pool-count" class="text-xs text-slate-500 font-medium">
+            20 casos clínicos disponíveis com os filtros atuais
+          </span>
+          <button
+            id="btn-start-quiz"
+            type="button"
+            class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-sm transition-colors"
+          >
+            Começar Quiz →
+          </button>
+        </div>
+      </div>
+
+      <!-- ETAPA B: INTERFACE ATIVA DO QUIZ (SEM PLANOS, SEM VETORES, SEM SPOILERS) -->
+      <div id="quiz-active-screen" class="hidden space-y-4">
+        <!-- Barra Superior do Quiz -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span id="quiz-question-badge" class="px-3 py-1 rounded-lg bg-indigo-600 text-white font-mono text-xs font-bold">
+              Caso 1
+            </span>
+            <div>
+              <h2 class="text-sm sm:text-base font-bold text-slate-900">
+                Interpretação de Eletrocardiograma em 12 Derivações
+              </h2>
+              <p id="quiz-active-filters-label" class="text-xs text-slate-500">
+                Utilize o compasso digital abaixo se desejar medir intervalos R–R, PR ou QRS.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 self-start sm:self-center">
+            <div class="bg-slate-50 border border-slate-200 px-3.5 py-1.5 rounded-xl text-center">
+              <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Acertos</span>
+              <span id="quiz-score-display" class="text-base font-extrabold font-mono text-slate-900">0 / 0</span>
+            </div>
+            <button
+              id="btn-reconfigure-quiz"
+              type="button"
+              class="px-3 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors"
+            >
+              Alterar Filtros
+            </button>
+          </div>
+        </div>
+
+        <!-- Card de Anamnese & Sinais Vitais (Exibido apenas se Etapa 1 estiver marcada) -->
+        <div id="quiz-anamnesis-card" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+              <span>📋</span> História Clínica & Exame Físico
+            </span>
+            <div id="quiz-vitals-bar" class="flex flex-wrap gap-2 font-mono text-[11px]"></div>
+          </div>
+          <p id="quiz-anamnesis-text" class="text-xs sm:text-sm text-slate-700 leading-relaxed"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SEÇÃO COMPARTILHADA: TRAÇADO EM 12 DERIVAÇÕES + TIRA DII + COMPASSO DIGITAL
+         (Sempre visível na aba Explorar e durante a Questão Ativa do Quiz)
+         ====================================================================== -->
+    <section id="ecg-paper-section" aria-label="ECG Completo em 12 Derivações" class="space-y-3">
+      <!-- Barra de Ferramentas do Papel Milimetrado (Compasso, Velocidade, Ganho, Monitor ao Vivo) -->
+      <div id="ecg-toolbar" class="bg-white rounded-2xl border border-slate-200 p-3 sm:px-4 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-sm sm:text-base font-bold text-slate-900">
+            Traçado Simultâneo em 12 Derivações + Tira de Ritmo (DII Longo)
+          </h2>
+          <p id="ecg-paper-subtitle" class="text-xs text-slate-500">
+            Layout clínico em 4 colunas (<span class="font-semibold text-slate-700">DI–DIII | aVR–aVF | V1–V3 | V4–V6</span>) · Papel milimetrado calibrado
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Compasso Digital (A1) -->
+          <button
+            id="btn-toggle-caliper"
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center gap-1.5 transition-colors"
+          >
+            <span>📐</span>
+            <span id="caliper-btn-label">Compasso Digital: Off</span>
+          </button>
+
+          <!-- Velocidade do Papel (A2) -->
+          <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+            <button type="button" data-speed="25" class="speed-btn px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-slate-900 shadow-xs">25 mm/s</button>
+            <button type="button" data-speed="50" class="speed-btn px-2.5 py-1 rounded-lg font-mono font-semibold text-slate-600 hover:text-slate-900">50 mm/s</button>
+          </div>
+
+          <!-- Ganho / Calibração (A2) -->
+          <div class="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+            <button type="button" data-gain="0.5" class="gain-btn px-2 py-1 rounded-lg font-mono font-semibold text-slate-600 hover:text-slate-900">N/2</button>
+            <button type="button" data-gain="1" class="gain-btn px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-slate-900 shadow-xs">10 mm/mV</button>
+            <button type="button" data-gain="2" class="gain-btn px-2 py-1 rounded-lg font-mono font-semibold text-slate-600 hover:text-slate-900">2N</button>
+          </div>
+
+          <!-- Monitor Cardíaco ao Vivo (A3) -->
+          <button
+            id="btn-toggle-live"
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 flex items-center gap-1.5 transition-colors"
+          >
+            <span id="live-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+            <span>Monitor ao Vivo</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Container Relativo das 12 Derivações + Tira DII (com suporte ao Compasso Digital sobreposto) -->
+      <div id="ecg-canvas-wrapper" class="relative space-y-4">
+        <!-- Overlay do Compasso Digital (Visível quando ativado) -->
+        <div id="caliper-overlay" class="hidden absolute inset-0 z-20 pointer-events-none">
+          <!-- Leitura Flutuante do Compasso -->
+          <div id="caliper-readout" class="pointer-events-auto absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-3.5 py-1.5 rounded-xl shadow-lg border border-slate-700 flex items-center gap-3 text-xs font-mono">
+            <span class="text-indigo-300 font-bold">Compasso:</span>
+            <span id="caliper-mm">0.0 mm</span>
+            <span class="text-slate-500">|</span>
+            <span id="caliper-ms" class="font-bold text-emerald-300">0 ms</span>
+            <span class="text-slate-500">|</span>
+            <span id="caliper-bpm" class="font-bold text-amber-300">-- bpm</span>
+          </div>
+
+          <!-- Haste 1 do Compasso -->
+          <div id="caliper-pin-1" style="left: 28%;" class="caliper-handle pointer-events-auto absolute top-0 bottom-0 w-0.5 bg-indigo-600 cursor-ew-resize group">
+            <div class="absolute top-10 -left-3.5 w-7 h-7 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md border-2 border-white">
+              P1
+            </div>
+          </div>
+
+          <!-- Haste 2 do Compasso -->
+          <div id="caliper-pin-2" style="left: 48%;" class="caliper-handle pointer-events-auto absolute top-0 bottom-0 w-0.5 bg-rose-600 cursor-ew-resize group">
+            <div class="absolute top-10 -left-3.5 w-7 h-7 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md border-2 border-white">
+              P2
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Colunas Clínicas de ECG -->
+        <div id="ecg-12-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div id="col-bipolars" class="flex flex-col gap-3"></div>
+          <div id="col-augmented" class="flex flex-col gap-3"></div>
+          <div id="col-precordial-right" class="flex flex-col gap-3"></div>
+          <div id="col-precordial-left" class="flex flex-col gap-3"></div>
+        </div>
+
+        <!-- Tira de Ritmo Contínua (DII Longo) -->
+        <div id="rhythm-strip-card" class="rounded-2xl bg-white p-3.5 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span class="text-sm font-extrabold text-slate-900">DII Longo — Tira de Ritmo</span>
+              <span id="rhythm-strip-cal-label" class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[11px] font-semibold">
+                25 mm/s · 10 mm/mV
+              </span>
+            </div>
+            <span class="text-[11px] text-slate-500">Avaliação contínua de ritmo, regularidade R–R e condução AV</span>
+          </div>
+          <div id="rhythm-strip-svg-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         PERGUNTAS DE MÚLTIPLA ESCOLHA DO QUIZ (ABAIXO DO ECG, SEM SPOILERS)
+         ====================================================================== -->
+    <section id="quiz-questions-section" class="hidden space-y-4">
+      <div id="quiz-stages-container" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Renderizado dinamicamente conforme as etapas escolhidas (Etapa 1, Etapa 2, Etapa 3) -->
+      </div>
+
+      <!-- Feedback e Botões de Ação do Quiz -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div id="quiz-feedback-box" class="hidden flex-1 rounded-xl p-4 border text-xs sm:text-sm leading-relaxed"></div>
+        <div class="flex items-center gap-2.5 sm:ml-auto shrink-0">
+          <button
+            id="btn-submit-quiz"
+            type="button"
+            disabled
+            class="px-5 py-2.5 rounded-xl bg-indigo-600 disabled:bg-slate-300 disabled:cursor-not-allowed hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-colors"
+          >
+            Confirmar Respostas
+          </button>
+          <button
+            id="btn-next-quiz"
+            type="button"
+            class="hidden px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-colors"
+          >
+            Próxima Questão →
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Rodapé Discreto com Autoria -->
+  <footer class="bg-white border-t border-slate-200 mt-10 py-4 px-4 sm:px-6">
+    <div class="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+      <span>Simulador Interativo de Eletrocardiografia em 12 Derivações · <strong class="font-semibold text-slate-500">by Pietro Limonge</strong></span>
+      <span class="font-mono text-[11px]">Calibração padrão: 25 mm/s · 10 mm/mV (1 quadrado grande = 5 mm)</span>
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * ============================================================================
+     * SIMULADOR VETORIAL & CLÍNICO DE ECG EM 12 DERIVAÇÕES
+     * by Pietro Limonge
+     * ============================================================================
+     */
+
+    // 1. Definição das 6 derivações do Plano Frontal (Sistema Hexaxial de Bailey)
+    const FRONTAL_LEADS = [
+      { id: 'DI',   name: 'DI',   plane: 'frontal', posAngle: 0,    negAngle: 180,  region: 'Lateral Alta',   pPol: 1,   isLateral: true,  isRightAnt: false, col: 'col-bipolars' },
+      { id: 'DII',  name: 'DII',  plane: 'frontal', posAngle: 60,   negAngle: -120, region: 'Parede Inferior',pPol: 1,   isLateral: false, isRightAnt: false, col: 'col-bipolars' },
+      { id: 'DIII', name: 'DIII', plane: 'frontal', posAngle: 120,  negAngle: -60,  region: 'Parede Inferior',pPol: 0.4, isLateral: false, isRightAnt: false, col: 'col-bipolars' },
+      { id: 'aVR',  name: 'aVR',  plane: 'frontal', posAngle: -150, negAngle: 30,   region: 'Cavidade Dir.',  pPol: -1,  isLateral: false, isRightAnt: false, col: 'col-augmented' },
+      { id: 'aVL',  name: 'aVL',  plane: 'frontal', posAngle: -30,  negAngle: 150,  region: 'Lateral Alta',   pPol: 0.5, isLateral: true,  isRightAnt: false, col: 'col-augmented' },
+      { id: 'aVF',  name: 'aVF',  plane: 'frontal', posAngle: 90,   negAngle: -90,  region: 'Parede Inferior',pPol: 1,   isLateral: false, isRightAnt: false, col: 'col-augmented' },
+    ];
+
+    // 2. Definição das 6 derivações do Plano Horizontal (Precordiais V1 a V6)
+    const HORIZONTAL_LEADS = [
+      { id: 'V1', name: 'V1', plane: 'horizontal', posAngle: 115, negAngle: -65,  region: 'Septal / VD',    pPol: 0.2, isLateral: false, isRightAnt: true,  col: 'col-precordial-right' },
+      { id: 'V2', name: 'V2', plane: 'horizontal', posAngle: 100, negAngle: -80,  region: 'Septal / VD',    pPol: 0.7, isLateral: false, isRightAnt: true,  col: 'col-precordial-right' },
+      { id: 'V3', name: 'V3', plane: 'horizontal', posAngle: 80,  negAngle: -100, region: 'Parede Anterior',pPol: 0.9, isLateral: false, isRightAnt: true,  col: 'col-precordial-right' },
+      { id: 'V4', name: 'V4', plane: 'horizontal', posAngle: 60,  negAngle: -120, region: 'Parede Anterior',pPol: 1,   isLateral: false, isRightAnt: false, col: 'col-precordial-left' },
+      { id: 'V5', name: 'V5', plane: 'horizontal', posAngle: 30,  negAngle: -150, region: 'Lateral Baixa',  pPol: 1,   isLateral: true,  isRightAnt: false, col: 'col-precordial-left' },
+      { id: 'V6', name: 'V6', plane: 'horizontal', posAngle: 0,   negAngle: 180,  region: 'Lateral Baixa',  pPol: 1,   isLateral: true,  isRightAnt: false, col: 'col-precordial-left' },
+    ];
+
+    /**
+     * 3. BANCO COMPLETO DE CENÁRIOS CLÍNICOS & CASOS DO QUIZ (20 CENÁRIOS)
+     */
+    const CLINICAL_CASES = [
+      {
+        id: 'normal',
+        label: 'Normal Fisiológico',
+        shortMeta: '+50° / -20°',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: 50,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 72,
+        rhythmType: 'sinus',
+        wallInfo: 'Fisiológico · 72 bpm',
+        ecgCriteria: 'Ritmo sinusal regular, eixo frontal em +50° (DI+, aVF+, DII+), zona de transição precordial fisiológica entre V3 e V4, intervalos PR (160 ms) e QRS (85 ms) normais.',
+        clinicalNote: 'Padrão eletrocardiográfico normal de adulto jovem/meia-idade em repouso, sem sobrecargas cavitárias ou distúrbios de condução.',
+        anamnesis: 'Paciente masculino, 28 anos, assintomático, realizando avaliação pré-participação esportiva. Nega comorbidades ou uso de medicações.',
+        vitals: { PA: '118×76 mmHg', FC: '72 bpm', FR: '14 irpm', SatO2: '99%' },
+        qStep1: {
+          prompt: 'Qual a leitura sistemática de ritmo e eixo frontal deste traçado?',
+          options: [
+            'Ritmo sinusal regular com eixo elétrico normal (entre -30° e +90°)',
+            'Ritmo sinusal com desvio do eixo para a esquerda (além de -30°)',
+            'Fibrilação atrial com resposta ventricular controlada',
+            'Ritmo sinusal com desvio do eixo para a direita (além de +90°)',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico final?',
+          options: [
+            'Eletrocardiograma dentro dos limites da normalidade',
+            'Sobrecarga Ventricular Esquerda (HVE)',
+            'Bloqueio Divisional Anterossuperior (BDAS)',
+            'IAMCSST de parede inferior',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta médica mais adequada?',
+          options: [
+            'Liberar para atividade física habitual e orientar hábitos saudáveis',
+            'Encaminhar imediatamente para cineangiocoronariografia',
+            'Iniciar anticoagulação plena com varfarina ou DOAC',
+            'Administrar gluconato de cálcio endovenoso',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'hve',
+        label: 'Hipertrofia VE (HVE)',
+        shortMeta: '-35° / -55° · 1.6x',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: -35,
+        horizontal: -55,
+        voltage: 1.6,
+        hr: 68,
+        rhythmType: 'sinus',
+        stOverrides: { V5: -1.4, V6: -1.6, DI: -1.0, aVL: -1.2 },
+        wallInfo: 'Sobrecarga VE · Sokolow > 35 mm',
+        ecgCriteria: 'Ondas S muito profundas em V1–V2 e ondas R amplas em V5–V6 (Sokolow-Lyon: S[V1] + R[V5/V6] > 35 mm), desvio do eixo para a esquerda (-35°) e padrão strain (infradesnivelamento discreto de ST-T) em derivações laterais.',
+        clinicalNote: 'Comum na hipertensão arterial sistêmica de longa data, estenose aórtica e cardiomiopatia hipertrófica.',
+        anamnesis: 'Homem, 64 anos, hipertenso há 20 anos com má adesão medicamentosa, refere dispneia aos grandes esforços. Ictus cordis propulsivo no 6º EIC.',
+        vitals: { PA: '176×104 mmHg', FC: '68 bpm', FR: '16 irpm', SatO2: '97%' },
+        qStep1: {
+          prompt: 'Sobre o eixo elétrico e a amplitude do QRS neste ECG, observa-se:',
+          options: [
+            'Desvio do eixo para a esquerda e aumento acentuado da voltagem precordial (Sokolow-Lyon > 35 mm)',
+            'Desvio extremo do eixo com baixa voltagem difusa',
+            'Onda R dominante em V1 com desvio do eixo para a direita',
+            'Ritmo irregular com ausência de ondas P',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual a principal hipótese diagnóstica eletrocardiográfica?',
+          options: [
+            'Sobrecarga Ventricular Esquerda (HVE) com padrão strain',
+            'Sobrecarga Ventricular Direita (HVD)',
+            'Bloqueio Completo de Ramo Direito (BRD)',
+            'Hipocalemia acentuada',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta ambulatorial prioritária para este paciente?',
+          options: [
+            'Otimizar controle pressórico rigoroso e solicitar ecocardiograma transtorácico',
+            'Realizar cardioversão elétrica sincronizada imediatamente',
+            'Administrar atropina 1 mg IV em bolus',
+            'Indicar implante imediato de marcapasso definitivo',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'hvd',
+        label: 'Hipertrofia VD (HVD)',
+        shortMeta: '+125° / +110° · 1.4x',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: 125,
+        horizontal: 110,
+        voltage: 1.4,
+        hr: 92,
+        rhythmType: 'sinus',
+        stOverrides: { V1: -1.3, V2: -1.2 },
+        wallInfo: 'Sobrecarga VD · R > S em V1',
+        ecgCriteria: 'Desvio do eixo frontal para a direita (+125°, DI negativo e aVF positivo), inversão do padrão precordial com onda R dominante em V1 (R > S) e ondas S profundas persistentes em V5 e V6.',
+        clinicalNote: 'Reflete aumento da massa muscular do ventrículo direito, típico de hipertensão arterial pulmonar, cor pulmonale crônico ou estenose pulmonar.',
+        anamnesis: 'Mulher, 49 anos, portadora de hipertensão arterial pulmonar idiopática, queixa-se de fadiga, edema de membros inferiores e turgência jugular a 45°.',
+        vitals: { PA: '108×70 mmHg', FC: '92 bpm', FR: '20 irpm', SatO2: '91%' },
+        qStep1: {
+          prompt: 'Quais achados vetoriais se destacam nos planos frontal e horizontal?',
+          options: [
+            'Desvio do eixo para a direita (DI negativo, aVF positivo) e onda R dominante em V1 (R > S)',
+            'Desvio do eixo para a esquerda com transição precordial normal em V3',
+            'Eixo normal com supradesnivelamento de ST em parede anterior',
+            'Intervalo PR prolongado acima de 280 ms',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico mais compatível?',
+          options: [
+            'Sobrecarga Ventricular Direita (HVD)',
+            'Sobrecarga Ventricular Esquerda (HVE)',
+            'Bloqueio Divisional Anterossuperior (BDAS)',
+            'Bloqueio Completo de Ramo Esquerdo (BRE)',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual investigação complementar confirma e quantifica a repercussão hemodinâmica?',
+          options: [
+            'Ecocardiograma Doppler para estimar pressão sistólica de artéria pulmonar e função do VD',
+            'Teste ergométrico em esteira sob protocolo de Bruce máximo',
+            'Dosagem isolada de potássio sérico sem exames de imagem',
+            'Massagem do seio carotídeo bilateral',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'bdas',
+        label: 'BDAS (Hemibloqueio)',
+        shortMeta: '-60° / -45°',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: -60,
+        horizontal: -45,
+        voltage: 1.1,
+        hr: 70,
+        rhythmType: 'sinus',
+        wallInfo: 'Desvio Esquerdo · -60°',
+        ecgCriteria: 'Desvio acentuado do eixo elétrico para a esquerda (além de -45°, aqui em -60°), padrão qR em DI e aVL, e padrão rS profundo em DII, DIII e aVF com SIII > SII.',
+        clinicalNote: 'Ocorre por bloqueio do fascículo anterossuperior do ramo esquerdo, deslocando a ativação final do VE para cima e para a esquerda. Frequentemente associado à cardiopatia chagásica ou hipertensiva.',
+        anamnesis: 'Homem, 58 anos, natural de área endêmica para doença de Chagas, assintomático cardiovascular, em consulta de rotina.',
+        vitals: { PA: '126×80 mmHg', FC: '70 bpm', FR: '15 irpm', SatO2: '98%' },
+        qStep1: {
+          prompt: 'Ao aplicar o algoritmo DI → aVF → DII neste traçado, encontramos:',
+          options: [
+            'DI positivo, aVF negativo e DII negativo (desvio do eixo para a esquerda além de -30°)',
+            'DI negativo e aVF positivo (desvio para a direita)',
+            'DI positivo, aVF positivo e DII positivo (eixo normal)',
+            'DI negativo e aVF negativo (desvio extremo)',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico característico deste padrão (qR em DI/aVL e rS em DII/DIII/aVF)?',
+          options: [
+            'Bloqueio Divisional Anterossuperior (BDAS)',
+            'Bloqueio Completo de Ramo Direito (BRD)',
+            'IAMCSST de parede inferior',
+            'Flutter Atrial típico',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta adequada para um BDAS isolado em paciente assintomático?',
+          options: [
+            'Acompanhamento clínico e investigação etiológica (ex.: sorologia para Chagas, ecocardiograma), sem indicação de marcapasso',
+            'Implante imediato de marcapasso bicameral de urgência',
+            'Trombólise química com alteplase',
+            'Cardioversão elétrica com 100 J',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'clockwise',
+        label: 'Rotação Horária (Trans. Tardia)',
+        shortMeta: '+75° / -65°',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: 75,
+        horizontal: -65,
+        voltage: 0.9,
+        hr: 78,
+        rhythmType: 'sinus',
+        wallInfo: 'Transição em V5–V6',
+        ecgCriteria: 'Eixo frontal verticalizado (+75°) e rotação horária no plano horizontal, deslocando a zona de transição isoelétrica (R ≈ S) tardiamente para V5–V6.',
+        clinicalNote: 'Clássico em pacientes com DPOC/enfisema pulmonar (hiperinsuflação rebaixa o diafragma e verticaliza o coração) ou má progressão de R.',
+        anamnesis: 'Homem, 67 anos, tabagista de 50 maços-ano com DPOC moderado, em acompanhamento ambulatorial estável.',
+        vitals: { PA: '122×78 mmHg', FC: '78 bpm', FR: '18 irpm', SatO2: '93%' },
+        qStep1: {
+          prompt: 'Onde ocorre a zona de transição precordial (R ≈ S) neste eletrocardiograma?',
+          options: [
+            'Transição tardia deslocada para V5–V6 (rotação horária)',
+            'Transição precoce em V1–V2 (rotação anti-horária)',
+            'Onda R dominante já em V1',
+            'Ausência completa de complexos QRS em precordiais',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Este padrão de verticalização frontal com transição precordial tardia associa-se frequentemente a:',
+          options: [
+            'Rotação horária do eixo elétrico (comum no DPOC / enfisema pulmonar)',
+            'Hipercalemia grave com onda sinusoidal',
+            'Taquicardia ventricular monomórfica',
+            'Bloqueio atrioventricular total',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Como interpretar este achado no contexto do paciente com DPOC estável?',
+          options: [
+            'Alteração posicional/anatômica compatível com hiperinsuflação pulmonar; manter seguimento clínico',
+            'Indicação imediata de angioplastia primária de artéria descendente anterior',
+            'Administrar adenosina 6 mg IV em bolus rápido',
+            'Iniciar sulfato de magnésio 2 g IV',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'counterclockwise',
+        label: 'Rotação Anti-horária (Trans. Precoce)',
+        shortMeta: '+15° / +25°',
+        category: 'vetores',
+        catLabel: 'Vetores & Sobrecargas',
+        level: 'basico',
+        frontal: 15,
+        horizontal: 25,
+        voltage: 1.0,
+        hr: 74,
+        rhythmType: 'sinus',
+        wallInfo: 'Transição em V1–V2',
+        ecgCriteria: 'Zona de transição precordial precoce: a onda R iguala ou supera a onda S já em V2 (rotação anti-horária no eixo longitudinal do coração).',
+        clinicalNote: 'Frequentemente uma variante normal em jovens e atletas, devendo ser diferenciada de sobrecarga ventricular direita ou infarto dorsal antigo.',
+        anamnesis: 'Mulher, 24 anos, atleta universitária, sem sintomas cardiovasculares, exame físico normal.',
+        vitals: { PA: '112×70 mmHg', FC: '74 bpm', FR: '14 irpm', SatO2: '99%' },
+        qStep1: {
+          prompt: 'Observando as derivações precordiais de V1 a V6, nota-se:',
+          options: [
+            'Transição precordial precoce (R ≈ S já em V2), caracterizando rotação anti-horária',
+            'Persistência de ondas S profundas até V6',
+            'Supradesnivelamento convexo de ST em V1–V4',
+            'Alargamento do QRS acima de 140 ms',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual a interpretação adequada deste traçado?',
+          options: [
+            'Rotação anti-horária (transição precordial precoce), variante fisiológica nesta faixa etária',
+            'IAMCSST de parede anterior extensa',
+            'Bloqueio Completo de Ramo Esquerdo',
+            'Fibrilação Atrial de alta resposta',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta indicada?',
+          options: [
+            'Tranquilizar a paciente, pois trata-se de variante fisiológica sem necessidade de intervenção',
+            'Internar em unidade coronariana para anticoagulação',
+            'Realizar cardioversão elétrica sincronizada',
+            'Prescrever amiodarona endovenosa',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'iam_anterior',
+        label: 'IAMCSST Anterior Extenso',
+        shortMeta: 'Supra V1–V4, DI, aVL',
+        category: 'isquemia',
+        catLabel: 'Isquemia / IAM',
+        level: 'internato',
+        frontal: 20,
+        horizontal: -10,
+        voltage: 1.0,
+        hr: 98,
+        rhythmType: 'sinus',
+        stOverrides: { V1: 3.5, V2: 5.5, V3: 5.0, V4: 3.8, DI: 2.2, aVL: 2.5, DII: -1.8, DIII: -2.4, aVF: -2.2 },
+        wallInfo: 'Parede Anterior Extensa · Artéria DA',
+        ecgCriteria: 'Supradesnivelamento pronunciado do segmento ST em V1, V2, V3, V4, DI e aVL, acompanhado de infradesnivelamento recíproco (imagem em espelho) na parede inferior (DII, DIII, aVF).',
+        clinicalNote: 'Indica oclusão trombótica aguda da Artéria Descendente Anterior (DA) proximal, antes da origem do primeiro ramo diagonal/septal. Alto risco de choque cardiogênico.',
+        anamnesis: 'Homem, 56 anos, tabagista e dislipidêmico, chega ao PS com dor torácica retroesternal em aperto de forte intensidade há 45 minutos, irradiada para membro superior esquerdo e acompanhada de sudorese fria.',
+        vitals: { PA: '134×86 mmHg', FC: '98 bpm', FR: '22 irpm', SatO2: '95%' },
+        qStep1: {
+          prompt: 'Quais derivações apresentam supradesnivelamento do segmento ST e imagem em espelho?',
+          options: [
+            'Supra de ST em V1–V4, DI e aVL, com infradesnivelamento recíproco em DII, DIII e aVF',
+            'Supra de ST isolado em DII, DIII e aVF com infra em V1–V3',
+            'Infradesnivelamento difuso de ST com ondas U proeminentes',
+            'Supradesnivelamento côncavo difuso em todas as 12 derivações sem espelho',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico sindrômico e a artéria coronária provavelmente culpada?',
+          options: [
+            'IAMCSST de parede anterior extensa — Artéria Descendente Anterior (DA) proximal',
+            'IAMCSST de parede inferior — Artéria Coronária Direita (CD)',
+            'Pericardite aguda viral sem comprometimento coronariano',
+            'Bloqueio Completo de Ramo Direito isolado',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta terapêutica imediata prioritária (hospital com hemodinâmica)?',
+          options: [
+            'AAS + inibidor P2Y12 + anticoagulação e encaminhamento imediato para angioplastia primária (porta-balão < 90 min)',
+            'Aguardar curva de troponina em 6 horas antes de iniciar antiagregação',
+            'Realizar teste ergométrico para estratificar risco isquêmico',
+            'Administrar verapamil endovenoso e dar alta com nitrato sublingual',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'iam_inferior',
+        label: 'IAMCSST Parede Inferior',
+        shortMeta: 'Supra DII, DIII, aVF',
+        category: 'isquemia',
+        catLabel: 'Isquemia / IAM',
+        level: 'internato',
+        frontal: 45,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 56,
+        rhythmType: 'sinus',
+        stOverrides: { DII: 3.4, DIII: 4.5, aVF: 4.0, DI: -2.2, aVL: -2.8 },
+        wallInfo: 'Parede Inferior · Artéria CD',
+        ecgCriteria: 'Supradesnivelamento do segmento ST em DII, DIII e aVF (DIII > DII) com imagem em espelho (infradesnivelamento de ST) em DI e aVL.',
+        clinicalNote: 'Sugere oclusão da Artéria Coronária Direita (CD). Obrigatório realizar derivações direitas (V3R e V4R) para pesquisar infarto de ventrículo direito antes de administrar nitratos.',
+        anamnesis: 'Mulher, 63 anos, diabética, apresenta dor epigástrica em queimação há 1 hora, associada a náuseas, vômitos e bradicardia sinusal.',
+        vitals: { PA: '96×62 mmHg', FC: '56 bpm', FR: '18 irpm', SatO2: '96%' },
+        qStep1: {
+          prompt: 'Qual o achado eletrocardiográfico mais evidente neste paciente?',
+          options: [
+            'Supradesnivelamento de ST em DII, DIII e aVF com imagem em espelho em DI e aVL',
+            'Supradesnivelamento de ST restrito a V1–V3',
+            'Ondas F em dente de serra a 300 bpm',
+            'Padrão rsR\' em V1 com QRS de 150 ms',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico e qual avaliação adicional é obrigatória neste território?',
+          options: [
+            'IAMCSST de parede inferior; realizar V3R e V4R para descartar acometimento de Ventrículo Direito',
+            'IAMCSST de parede lateral alta; realizar derivações abdominais',
+            'Hipercalemia grave; dosar cálcio ionizado',
+            'Taquicardia supraventricular por reentrada nodal',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Em relação ao uso de nitratos (ex.: dinitrato de isossorbida) neste caso, deve-se:',
+          options: [
+            'Evitar nitratos até descartar infarto de VD (V3R/V4R), pelo risco de hipotensão grave',
+            'Administrar nitroglicerina em dose máxima mesmo com PA limítrofe',
+            'Suspender AAS e clopidogrel até realizar ecocardiograma',
+            'Indicar cardioversão elétrica sincronizada',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'iam_lateral',
+        label: 'IAMCSST Parede Lateral',
+        shortMeta: 'Supra DI, aVL, V5–V6',
+        category: 'isquemia',
+        catLabel: 'Isquemia / IAM',
+        level: 'internato',
+        frontal: 10,
+        horizontal: -15,
+        voltage: 1.0,
+        hr: 86,
+        rhythmType: 'sinus',
+        stOverrides: { DI: 2.8, aVL: 3.2, V5: 2.6, V6: 2.8, DIII: -2.2, aVF: -1.6, V1: -1.4 },
+        wallInfo: 'Parede Lateral · Artéria CX',
+        ecgCriteria: 'Supradesnivelamento de ST em derivações laterais altas (DI, aVL) e baixas (V5, V6), com infradesnivelamento recíproco em DIII, aVF e V1.',
+        clinicalNote: 'Corresponde à oclusão da Artéria Circunflexa (CX) ou primeiro ramo marginal obtuso. Recomenda-se registrar V7, V8 e V9 para avaliar extensão dorsal.',
+        anamnesis: 'Homem, 60 anos, hipertenso e tabagista, refere desconforto torácico opressivo irradiado para dorso e mandíbula há 50 minutos.',
+        vitals: { PA: '138×84 mmHg', FC: '86 bpm', FR: '18 irpm', SatO2: '97%' },
+        qStep1: {
+          prompt: 'As alterações isquêmicas agudas concentram-se principalmente em:',
+          options: [
+            'Derivações laterais (DI, aVL, V5 e V6) com espelho em parede inferior (DIII/aVF)',
+            'Parede septal exclusivamente (V1 e V2)',
+            'Apenas na derivação aVR',
+            'Ritmo ventricular idioventricular lento',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico mais preciso?',
+          options: [
+            'IAMCSST de parede lateral (alta e baixa) — Artéria Circunflexa',
+            'Bloqueio Completo de Ramo Esquerdo antigo',
+            'Sobrecarga Ventricular Direita',
+            'Hipocalemia leve',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a estratégia de reperfusão e manejo inicial indicada?',
+          options: [
+            'Terapia de reperfusão imediata (angioplastia primária ou fibrinolítico se indisponível) + dupla antiagregação',
+            'Observação clínica por 24 horas sem antiagregantes',
+            'Administrar adenosina endovenosa',
+            'Realizar pericardiocentese de alívio',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'brd',
+        label: 'Bloqueio Ramo Direito (BRD)',
+        shortMeta: 'QRS 140 ms · rsR\' V1',
+        category: 'bloqueios',
+        catLabel: 'Bloqueios de Ramo',
+        level: 'clinico',
+        frontal: 55,
+        horizontal: -10,
+        voltage: 1.0,
+        hr: 75,
+        rhythmType: 'sinus',
+        qrsWidthMs: 140,
+        blockType: 'rbbb',
+        stOverrides: { V1: -1.1, V2: -1.0 },
+        wallInfo: 'QRS ≥ 120 ms · rsR\' em V1–V2',
+        ecgCriteria: 'Duração do QRS ≥ 120 ms (140 ms), complexo trifásico rsR\' ("orelha de coelho") com onda R\' ampla e tardia em V1–V2, e onda S larga e empastada em DI, aVL, V5 e V6.',
+        clinicalNote: 'A despolarização do VD ocorre tardiamente célula a célula a partir do VE, gerando forças terminais lentas para a direita e para a frente.',
+        anamnesis: 'Mulher, 52 anos, assintomática, realizando ECG pré-operatório de colecistectomia eletiva. Desdobramento fixo/amplo de B2 à ausculta.',
+        vitals: { PA: '124×78 mmHg', FC: '75 bpm', FR: '15 irpm', SatO2: '98%' },
+        qStep1: {
+          prompt: 'Quanto à duração e morfologia do complexo QRS nas precordiais, nota-se:',
+          options: [
+            'QRS alargado (≥ 120 ms) com padrão rsR\' em V1–V2 e onda S empastada em V5–V6 e DI',
+            'QRS estreito (< 100 ms) com supradesnivelamento de ST difuso',
+            'QRS alargado com onda R monofásica entalhada em V5–V6 e QS em V1',
+            'Ondas P bloqueadas de forma intermitente',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Bloqueio Completo de Ramo Direito (BRD)',
+            'Bloqueio Completo de Ramo Esquerdo (BRE)',
+            'Sobrecarga Ventricular Esquerda',
+            'Fibrilação Atrial',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Em paciente assintomática no pré-operatório de cirurgia eletiva, qual a conduta?',
+          options: [
+            'Liberar para o procedimento com avaliação cardiológica de rotina (ecocardiograma para descartar cardiopatia estrutural)',
+            'Contraindicar a cirurgia permanentemente e implantar marcapasso',
+            'Iniciar trombólise endovenosa imediata',
+            'Realizar cardioversão elétrica',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'bre',
+        label: 'Bloqueio Ramo Esquerdo (BRE)',
+        shortMeta: 'QRS 150 ms · Torre V5–V6',
+        category: 'bloqueios',
+        catLabel: 'Bloqueios de Ramo',
+        level: 'clinico',
+        frontal: -25,
+        horizontal: -40,
+        voltage: 1.15,
+        hr: 72,
+        rhythmType: 'sinus',
+        qrsWidthMs: 150,
+        blockType: 'lbbb',
+        stOverrides: { DI: -1.4, aVL: -1.5, V5: -1.6, V6: -1.6, V1: 1.2, V2: 1.4 },
+        wallInfo: 'QRS ≥ 120 ms · R entalhada V5–V6',
+        ecgCriteria: 'QRS alargado (150 ms), complexos QS profundos e largos em V1–V3, ondas R monofásicas largas e entalhadas ("em torre") sem onda q septal em DI, aVL, V5 e V6, e alterações secundárias de ST-T discordantes.',
+        clinicalNote: 'Quase sempre indica cardiopatia estrutural subjacente (cardiomiopatia dilatada, doença isquêmica ou hipertensiva). Em paciente com dor torácica aguda, aplicar critérios de Sgarbossa.',
+        anamnesis: 'Homem, 68 anos, com insuficiência cardíaca crônica (FEVE 38%), em acompanhamento ambulatorial compensado, sem dor torácica.',
+        vitals: { PA: '116×72 mmHg', FC: '72 bpm', FR: '16 irpm', SatO2: '97%' },
+        qStep1: {
+          prompt: 'Qual a característica morfológica predominante do complexo QRS neste ECG?',
+          options: [
+            'QRS alargado (≥ 120 ms) com ondas R largas/entalhadas em DI, aVL, V5–V6 e QS profundo em V1–V3',
+            'QRS estreito com ondas T apiculadas em tenda',
+            'Padrão rsR\' em V1 com eixo desviado para a direita',
+            'Intervalos R–R completamente irregulares sem onda P',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Bloqueio Completo de Ramo Esquerdo (BRE)',
+            'Bloqueio Completo de Ramo Direito (BRD)',
+            'Bloqueio Divisional Anterossuperior isolado',
+            'Flutter Atrial 2:1',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Considerando o histórico de IC com FEVE 38% e BRE (QRS 150 ms), qual terapia pode beneficiar este paciente?',
+          options: [
+            'Otimização clínica da IC e avaliação de Terapia de Ressincronização Cardíaca (TRC)',
+            'Suspender betabloqueador e IECA imediatamente',
+            'Administrar adenosina 12 mg IV',
+            'Realizar manobra vagal de Valsalva modificada',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'fa',
+        label: 'Fibrilação Atrial (FA)',
+        shortMeta: 'R–R Irregular · Sem P',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'internato',
+        frontal: 45,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 128,
+        rhythmType: 'afib',
+        wallInfo: 'Taquiarritmia Irregular · ~128 bpm',
+        ecgCriteria: 'Ausência completa de ondas P organizadas, substituídas por ondulações fibrilatórias finas (ondas f) na linha de base, associada a intervalos R–R francamente irregulares ("irregularmente irregular").',
+        clinicalNote: 'Arritmia sustentada mais comum na prática clínica. Aumenta em 5x o risco de AVC cardioembólico; avaliar escore CHA₂DS₂-VASc.',
+        anamnesis: 'Mulher, 74 anos, hipertensa e diabética, procura atendimento por palpitações taquicárdicas e fadiga iniciadas há 12 horas. Pulso radial arrítmico.',
+        vitals: { PA: '132×84 mmHg', FC: '128 bpm', FR: '18 irpm', SatO2: '97%' },
+        qStep1: {
+          prompt: 'Analisando a tira de ritmo DII longo, qual a característica fundamental do ritmo?',
+          options: [
+            'Ritmo irregularmente irregular sem ondas P identificáveis',
+            'Ritmo sinusal regular com intervalo PR de 280 ms',
+            'Taquicardia regular com ondas F em dente de serra',
+            'Dissociação atrioventricular completa com FC de 38 bpm',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Fibrilação Atrial (FA) com alta resposta ventricular',
+            'Flutter Atrial típico com condução 2:1',
+            'Taquicardia Ventricular Monomórfica',
+            'Bloqueio Atrioventricular de 2º Grau Mobitz I',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Como paciente hemodinamicamente estável, quais são os pilares iniciais da conduta?',
+          options: [
+            'Controle da frequência cardíaca (ex.: betabloqueador) e avaliação de anticoagulação pelo CHA₂DS₂-VASc',
+            'Cardioversão elétrica imediata sem sedação e sem anticoagulação',
+            'Implante de marcapasso transcutâneo de urgência',
+            'Administração de atropina 1 mg IV',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'flutter',
+        label: 'Flutter Atrial Típico 2:1',
+        shortMeta: 'Ondas F · 150 bpm',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'internato',
+        frontal: 50,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 150,
+        rhythmType: 'flutter',
+        wallInfo: 'Macrorreentrada Atrial · 150 bpm',
+        ecgCriteria: 'Ondas F atriais regulares em "dente de serra" negativas nas derivações inferiores (DII, DIII, aVF) a ~300 bpm, com bloqueio AV fisiológico 2:1 resultando em resposta ventricular regular de 150 bpm.',
+        clinicalNote: 'Sempre suspeitar de Flutter Atrial 2:1 diante de uma taquicardia regular de QRS estreito exatamente em torno de 150 bpm.',
+        anamnesis: 'Homem, 65 anos, portador de cardiopatia isquêmica, refere palpitações súbitas e dispneia leve há 4 horas. Sem dor torácica ou hipotensão.',
+        vitals: { PA: '124×80 mmHg', FC: '150 bpm', FR: '18 irpm', SatO2: '96%' },
+        qStep1: {
+          prompt: 'O que se observa na linha de base das derivações inferiores (DII, DIII e aVF)?',
+          options: [
+            'Ondas atriais regulares em "dente de serra" (ondas F) com condução 2:1 e FC ~150 bpm',
+            'Ondas P sinusais precedendo cada QRS com FC de 60 bpm',
+            'Complexos QRS muito largos (> 160 ms) com desvio extremo do eixo',
+            'Supra de ST em parede anterior extensa',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Flutter Atrial típico com condução atrioventricular 2:1',
+            'Taquicardia Sinusal fisiológica',
+            'Bloqueio Atrioventricular Total (3º grau)',
+            'Hipocalemia acentuada',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a abordagem adequada para este paciente estável?',
+          options: [
+            'Controle de resposta ventricular (betabloqueador/bloqueador de canal de cálcio) e estratificação tromboembólica igual à FA',
+            'Administrar atropina para acelerar a condução AV para 1:1',
+            'Alta imediata sem medicações',
+            'Administrar gluconato de cálcio 10% IV',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'tsv',
+        label: 'Taquicardia Supraventricular (TSV)',
+        shortMeta: 'Regular QRS Estreito · 180 bpm',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'internato',
+        frontal: 55,
+        horizontal: -15,
+        voltage: 1.0,
+        hr: 180,
+        rhythmType: 'svt',
+        wallInfo: 'Reentrada Nodal · 180 bpm',
+        ecgCriteria: 'Taquicardia de complexos QRS estreitos (< 120 ms), intervalos R–R rigorosamente regulares em frequência elevada (~180 bpm) e ausência de onda P sinusal visível antes do QRS (onda P retrógrada oculta no QRS).',
+        clinicalNote: 'A causa mais frequente é a Taquicardia por Reentrada Nodal (TRN), comum em adultos jovens sem cardiopatia estrutural.',
+        anamnesis: 'Mulher, 31 anos, hígida, dá entrada no PS com palpitações rápidas de início súbito ("liga-desliga") há 30 minutos enquanto estudava. Lúcida, sem dor torácica.',
+        vitals: { PA: '114×74 mmHg', FC: '180 bpm', FR: '18 irpm', SatO2: '99%' },
+        qStep1: {
+          prompt: 'Como se caracteriza este traçado quanto à frequência, regularidade e largura do QRS?',
+          options: [
+            'Taquicardia regular de QRS estreito (~180 bpm) sem ondas P sinusais visíveis',
+            'Bradicardia irregular com ondas P bloqueadas',
+            'Taquicardia irregular de QRS estreito (Fibrilação Atrial)',
+            'Taquicardia regular de QRS muito largo (Taquicardia Ventricular)',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico mais provável?',
+          options: [
+            'Taquicardia Supraventricular Paroxística (TSVP / Reentrada Nodal)',
+            'Taquicardia Ventricular Monomórfica Sustentada',
+            'Bloqueio Atrioventricular de 1º Grau',
+            'IAMCSST de parede inferior',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a sequência inicial de manejo na sala de emergência para paciente estável?',
+          options: [
+            'Manobra vagal (Valsalva modificada) seguida de Adenosina 6 mg IV em bolus rápido se refratária',
+            'Desfibrilação não sincronizada com 200 J',
+            'Implante imediato de marcapasso transvenoso',
+            'Trombólise com tenecteplase',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'tv',
+        label: 'Taquicardia Ventricular (TV)',
+        shortMeta: 'QRS Largo 170 ms · 168 bpm',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'internato',
+        frontal: -135,
+        horizontal: 115,
+        voltage: 1.35,
+        hr: 168,
+        rhythmType: 'vt',
+        qrsWidthMs: 170,
+        wallInfo: 'QRS Largo · Eixo Extremo · 168 bpm',
+        ecgCriteria: 'Taquicardia regular de complexos QRS muito largos (170 ms), frequência de 168 bpm, ausência de ondas P precedendo os complexos, desvio extremo do eixo (-135°) e concordância precordial positiva.',
+        clinicalNote: 'Toda taquicardia regular de QRS largo deve ser tratada como Taquicardia Ventricular até prova em contrário, especialmente em pacientes com histórico de infarto prévio.',
+        anamnesis: 'Homem, 69 anos, antecedente de IAM prévio há 4 anos, chega ao pronto-socorro pálido, sudoreico, com tontura intensa, pré-síncope e pressão arterial baixa.',
+        vitals: { PA: '78×46 mmHg', FC: '168 bpm', FR: '26 irpm', SatO2: '91%' },
+        qStep1: {
+          prompt: 'Quais achados críticos definem este traçado de emergência?',
+          options: [
+            'Taquicardia regular de QRS muito largo (≥ 160 ms) e desvio extremo do eixo frontal',
+            'Bradicardia sinusal com QRS estreito',
+            'Fibrilação atrial controlada com QRS estreito',
+            'Intervalo PR longo isolado',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico prioritário?',
+          options: [
+            'Taquicardia Ventricular Monomórfica Sustentada (instável)',
+            'Taquicardia Sinusal reativa',
+            'Bloqueio Completo de Ramo Direito benigno',
+            'Bloqueio Atrioventricular de 2º Grau Mobitz I',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Diante da instabilidade hemodinâmica (PA 78×46 mmHg, pré-síncope) com pulso presente, qual a conduta imediata?',
+          options: [
+            'Cardioversão elétrica sincronizada imediata (100 J bifásico) com sedação rápida',
+            'Realizar manobra vagal e aguardar 30 minutos',
+            'Administrar verapamil endovenoso lento',
+            'Solicitar Holter de 24 horas ambulatorial',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'bav1',
+        label: 'BAV de 1º Grau',
+        shortMeta: 'PR Fixo 280 ms',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'clinico',
+        frontal: 45,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 64,
+        rhythmType: 'avb1',
+        prMs: 280,
+        wallInfo: 'Atraso Nodal · PR > 200 ms',
+        ecgCriteria: 'Ritmo sinusal regular onde toda onda P é seguida de um complexo QRS, porém com intervalo PR constante e prolongado acima de 200 ms (aqui 280 ms = 7 quadradinhos).',
+        clinicalNote: 'Representa apenas atraso na condução pelo nó atrioventricular, sem falha de condução. Pode ocorrer por hipertonia vagal, betabloqueadores, bloqueadores de canal de cálcio ou digoxina.',
+        anamnesis: 'Homem, 61 anos, hipertenso em uso de atenolol e diltiazem, assintomático em consulta de retorno.',
+        vitals: { PA: '122×76 mmHg', FC: '64 bpm', FR: '14 irpm', SatO2: '98%' },
+        qStep1: {
+          prompt: 'Medindo o intervalo do início da onda P ao início do QRS na tira DII longo, observa-se:',
+          options: [
+            'Intervalo PR fixo e prolongado (> 200 ms / > 5 quadradinhos), com todas as ondas P conduzidas',
+            'Alargamento progressivo do PR até o bloqueio de uma onda P',
+            'Dissociação completa entre ondas P e complexos QRS',
+            'Ausência de ondas P com ritmo irregular',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Bloqueio Atrioventricular (BAV) de 1º Grau',
+            'Bloqueio Atrioventricular de 2º Grau Mobitz I',
+            'Bloqueio Atrioventricular Total (3º Grau)',
+            'Flutter Atrial',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta mais adequada neste caso?',
+          options: [
+            'Revisar medicações dromotrópicas negativas (associação de betabloqueador + diltiazem) e observar; não requer marcapasso',
+            'Implante imediato de marcapasso definitivo',
+            'Cardioversão elétrica sincronizada',
+            'Administrar adrenalina em infusão contínua',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'bav2_m1',
+        label: 'BAV 2º Grau Mobitz I (Wenckebach)',
+        shortMeta: 'PR Progressivo + Falha',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'clinico',
+        frontal: 50,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 58,
+        rhythmType: 'wenckebach',
+        wallInfo: 'Fenômeno de Wenckebach',
+        ecgCriteria: 'Prolongamento progressivo do intervalo PR a cada batimento consecutivo (180 ms → 240 ms → 310 ms) até que uma onda P falha em conduzir (onda P bloqueada sem QRS), reiniciando o ciclo com PR mais curto.',
+        clinicalNote: 'Geralmente de localização supra-hissiana (nó AV), com bom prognóstico. Comum em atletas por hipertonia vagal ou no infarto de parede inferior.',
+        anamnesis: 'Jovem, 26 anos, corredor de maratona, realizou ECG de rotina em repouso pela manhã, completamente assintomático.',
+        vitals: { PA: '116×72 mmHg', FC: '58 bpm', FR: '13 irpm', SatO2: '99%' },
+        qStep1: {
+          prompt: 'O que acontece sequencialmente na tira de ritmo DII longo?',
+          options: [
+            'O intervalo PR alarga-se progressivamente até que uma onda P é bloqueada, reiniciando o ciclo',
+            'O intervalo PR permanece constante e uma onda P falha subitamente sem aviso',
+            'Não há relação nenhuma entre ondas P e QRS',
+            'O QRS tem 170 ms com frequência de 170 bpm',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico deste fenômeno eletrocardiográfico?',
+          options: [
+            'Bloqueio Atrioventricular de 2º Grau Mobitz I (Fenômeno de Wenckebach)',
+            'Bloqueio Atrioventricular de 1º Grau',
+            'Bloqueio Atrioventricular Total (3º Grau)',
+            'Fibrilação Atrial',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Em atleta assintomático, qual a conduta apropriada?',
+          options: [
+            'Conduta expectante (fenômeno vagal fisiológico no condicionamento aeróbico), sem indicação de marcapasso',
+            'Implante imediato de marcapasso definitivo',
+            'Iniciar amiodarona oral',
+            'Realizar ablação por cateter de urgência',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'bavt',
+        label: 'BAV Total (3º Grau / BAVT)',
+        shortMeta: 'Dissociação AV · Escape 38 bpm',
+        category: 'arritmias',
+        catLabel: 'Arritmias & BAVs',
+        level: 'internato',
+        frontal: -45,
+        horizontal: -30,
+        voltage: 1.0,
+        hr: 38,
+        rhythmType: 'avb3',
+        qrsWidthMs: 145,
+        wallInfo: 'Dissociação AV · 38 bpm',
+        ecgCriteria: 'Dissociação atrioventricular completa: ondas P regulares (~90 bpm) e complexos QRS regulares (~38 bpm) batem de forma totalmente independente, com intervalos PR constantemente variáveis.',
+        clinicalNote: 'Nenhum estímulo atrial chega aos ventrículos; o coração é mantido por um foco de escape juncional ou idioventricular lento. Emergência médica.',
+        anamnesis: 'Idoso, 79 anos, trazido por familiares após episódio de síncope súbita em casa. Apresenta-se sonolento, tonto e bradicárdico.',
+        vitals: { PA: '84×50 mmHg', FC: '38 bpm', FR: '20 irpm', SatO2: '94%' },
+        qStep1: {
+          prompt: 'Qual a relação entre as ondas P e os complexos QRS na tira de ritmo?',
+          options: [
+            'Dissociação AV completa: ondas P regulares (~90 bpm) totalmente independentes dos QRS lentos (~38 bpm)',
+            'Cada onda P é seguida por um QRS com PR fixo de 160 ms',
+            'Ausência de ondas P com ritmo rápido e irregular',
+            'Taquicardia de QRS estreito a 180 bpm',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o diagnóstico eletrocardiográfico?',
+          options: [
+            'Bloqueio Atrioventricular Total (BAVT / 3º Grau) com ritmo de escape ventricular',
+            'Bloqueio Atrioventricular de 1º Grau',
+            'Bloqueio Completo de Ramo Esquerdo sem bloqueio AV',
+            'Flutter Atrial 2:1',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta imediata na sala de emergência para este BAVT sintomático/instável?',
+          options: [
+            'Preparar marcapasso transcutâneo imediato (enquanto providencia transvenoso e eventual definitivo)',
+            'Administrar betabloqueador endovenoso para controlar a frequência',
+            'Realizar manobra vagal de compressão ocular',
+            'Dar alta com orientação de retorno ambulatorial em 30 dias',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'hipercalemia',
+        label: 'Hipercalemia Grave',
+        shortMeta: 'Onda T em Tenda · QRS Largo',
+        category: 'eletroliticos',
+        catLabel: 'Distúrbios Eletrolíticos',
+        level: 'clinico',
+        frontal: 30,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 60,
+        rhythmType: 'hyperk',
+        qrsWidthMs: 145,
+        wallInfo: 'K⁺ Elevado · T Apiculada',
+        ecgCriteria: 'Ondas T altas, estreitas, simétricas e apiculadas ("em tenda") principalmente nas precordiais (V2–V5), associadas a achatamento das ondas P e alargamento difuso do complexo QRS.',
+        clinicalNote: 'Reflete hiperexcitabilidade inicial seguida de lentificação da condução pelo excesso de potássio extracelular, com risco iminente de fibrilação ventricular ou assistolia.',
+        anamnesis: 'Homem, 62 anos, portador de doença renal crônica dialítica que faltou às duas últimas sessões de hemodiálise, chega com fraqueza muscular intensa e parestesias.',
+        vitals: { PA: '148×88 mmHg', FC: '60 bpm', FR: '20 irpm', SatO2: '96%' },
+        qStep1: {
+          prompt: 'Quais alterações morfológicas chamam atenção nas ondas T, ondas P e complexo QRS?',
+          options: [
+            'Ondas T altas, simétricas e apiculadas ("em tenda"), achatamento de P e alargamento do QRS',
+            'Infradesnivelamento de ST com ondas U proeminentes',
+            'Supradesnivelamento localizado de ST em DII, DIII e aVF',
+            'Ondas F em dente de serra a 300 bpm',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o distúrbio hidroeletrolítico classicamente responsável por este padrão?',
+          options: [
+            'Hipercalemia grave',
+            'Hipocalemia acentuada',
+            'Hipercalcemia leve',
+            'Hiponatremia isolada',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a primeira medida farmacológica para estabilizar imediatamente a membrana miocárdica?',
+          options: [
+            'Gluconato de cálcio 10% endovenoso (seguido de medidas de redistribuição como insulina + glicose e diálise)',
+            'Reposição rápida de cloreto de potássio endovenoso',
+            'Administrar espironolactona e enalapril',
+            'Cardioversão elétrica sincronizada',
+          ],
+          correct: 0,
+        },
+      },
+      {
+        id: 'hipocalemia',
+        label: 'Hipocalemia Acentuada',
+        shortMeta: 'Infra ST + Onda U',
+        category: 'eletroliticos',
+        catLabel: 'Distúrbios Eletrolíticos',
+        level: 'clinico',
+        frontal: 50,
+        horizontal: -20,
+        voltage: 1.0,
+        hr: 80,
+        rhythmType: 'hypok',
+        stOverrides: { V2: -1.3, V3: -1.5, V4: -1.4, V5: -1.1, DII: -0.9 },
+        wallInfo: 'K⁺ Baixo · Onda U Proeminente',
+        ecgCriteria: 'Infradesnivelamento difuso do segmento ST, achatamento/inversão da onda T e aparecimento de onda U proeminente logo após a onda T (bem visível em V2–V4), prolongando a repolarização.',
+        clinicalNote: 'Aumenta o risco de arritmias ventriculares polimórficas (Torsades de Pointes). Frequentemente associada ao uso de diuréticos de alça/tiazídicos ou perdas gastrointestinais.',
+        anamnesis: 'Mulher, 54 anos, em uso de furosemida em altas doses sem reposição eletrolítica e quadro de diarreia persistente há 4 dias, refere câimbras e fraqueza.',
+        vitals: { PA: '104×66 mmHg', FC: '80 bpm', FR: '16 irpm', SatO2: '98%' },
+        qStep1: {
+          prompt: 'O que se observa na fase de repolarização ventricular (segmento ST, onda T e após T) em V2–V4?',
+          options: [
+            'Infradesnivelamento de ST, achatamento de T e onda U proeminente após a onda T',
+            'Ondas T altas e apiculadas "em tenda" com QRS muito largo',
+            'Supradesnivelamento convexo de ST em V1–V4',
+            'Dissociação atrioventricular completa',
+          ],
+          correct: 0,
+        },
+        qStep2: {
+          prompt: 'Qual o distúrbio eletrolítico compatível com este traçado?',
+          options: [
+            'Hipocalemia acentuada',
+            'Hipercalemia grave',
+            'IAMCSST de parede anterior',
+            'Bloqueio Completo de Ramo Esquerdo',
+          ],
+          correct: 0,
+        },
+        qStep3: {
+          prompt: 'Qual a conduta terapêutica indicada?',
+          options: [
+            'Reposição cuidadosa de potássio (e magnésio sérico associado) sob monitorização eletrocardiográfica',
+            'Administrar insulina regular com glicose para reduzir o potássio',
+            'Iniciar furosemida endovenosa em bolus',
+            'Implante de marcapasso definitivo',
+          ],
+          correct: 0,
+        },
+      },
+    ];
+
+    // Estado reativo global
+    const state = {
+      activeTab: 'explore', // 'explore' | 'quiz'
+      activeCaseId: 'normal',
+      categoryFilter: 'all',
+
+      // Vetores e calibração
+      frontalAngle: 50,
+      horizontalAngle: -20,
+      voltageScale: 1.0,
+      selectedFrontalId: 'DII',
+      selectedHorizontalId: 'V4',
+      draggingPlane: null,
+
+      // Ferramentas do papel milimetrado (Bloco A)
+      paperSpeed: 25, // 25 | 50 mm/s
+      paperGain: 1,   // 0.5 | 1 | 2
+      caliperActive: false,
+      caliperP1Pct: 28,
+      caliperP2Pct: 48,
+      draggingPin: null, // 'p1' | 'p2' | null
+      liveMonitor: false,
+      liveSweepPct: 0,
+
+      // Estado do Modo Quiz
+      quizStarted: false,
+      quizLevel: 'all',
+      quizCategories: ['vetores', 'isquemia', 'bloqueios', 'arritmias', 'eletroliticos'],
+      quizStages: { anamnesis: true, diagnosis: true, conduct: true },
+      quizCurrentCase: null,
+      quizAnswers: { step1: null, step2: null, step3: null },
+      quizSubmitted: false,
+      quizScoreCorrect: 0,
+      quizScoreTotal: 0,
+      quizCaseNumber: 0,
+      quizUsedIds: [],
+    };
+
+    // Constantes geométricas dos SVGs dos Planos (500 x 500)
+    const CX = 250;
+    const CY = 250;
+    const R_OUTER = 175;
+    const R_VECTOR_BASE = 142;
+    const R_LABEL = 214;
+
+    // Cache de elementos do DOM
+    const dom = {
+      tabBtnExplore: document.getElementById('tab-btn-explore'),
+      tabBtnQuiz: document.getElementById('tab-btn-quiz'),
+      exploreControlsWrapper: document.getElementById('explore-controls-wrapper'),
+      quizView: document.getElementById('quiz-view'),
+      quizSetupScreen: document.getElementById('quiz-setup-screen'),
+      quizActiveScreen: document.getElementById('quiz-active-screen'),
+      ecgPaperSection: document.getElementById('ecg-paper-section'),
+      ecgPaperSubtitle: document.getElementById('ecg-paper-subtitle'),
+      quizQuestionsSection: document.getElementById('quiz-questions-section'),
+
+      presetsContainer: document.getElementById('presets-container'),
+      pathologySummaryBanner: document.getElementById('pathology-summary-banner'),
+      pathBannerCat: document.getElementById('path-banner-cat'),
+      pathBannerTitle: document.getElementById('path-banner-title'),
+      pathBannerHr: document.getElementById('path-banner-hr'),
+      pathBannerWall: document.getElementById('path-banner-wall'),
+      pathBannerEcg: document.getElementById('path-banner-ecg'),
+      pathBannerClinical: document.getElementById('path-banner-clinical'),
+
+      // Círculos Frontal & Horizontal
+      frontalSvg: document.getElementById('frontal-svg'),
+      frontalZones: document.getElementById('frontal-zones'),
+      frontalGrid: document.getElementById('frontal-grid'),
+      frontalLeads: document.getElementById('frontal-leads'),
+      frontalProjection: document.getElementById('frontal-projection'),
+      frontalVector: document.getElementById('frontal-vector'),
+      frontalLabels: document.getElementById('frontal-labels'),
+      frontalSelectedBadge: document.getElementById('frontal-selected-badge'),
+      frontalSlider: document.getElementById('frontal-slider'),
+      frontalInput: document.getElementById('frontal-input'),
+
+      horizontalSvg: document.getElementById('horizontal-svg'),
+      horizontalZones: document.getElementById('horizontal-zones'),
+      horizontalAnatomy: document.getElementById('horizontal-anatomy'),
+      horizontalLeads: document.getElementById('horizontal-leads'),
+      horizontalProjection: document.getElementById('horizontal-projection'),
+      horizontalVector: document.getElementById('horizontal-vector'),
+      horizontalLabels: document.getElementById('horizontal-labels'),
+      horizontalSelectedBadge: document.getElementById('horizontal-selected-badge'),
+      horizontalSlider: document.getElementById('horizontal-slider'),
+      horizontalInput: document.getElementById('horizontal-input'),
+      quickTransitionBadge: document.getElementById('quick-transition-badge'),
+
+      voltageSlider: document.getElementById('voltage-slider'),
+      voltageDisplay: document.getElementById('voltage-display'),
+
+      // Diagnóstico Frontal & Horizontal
+      frontalDiagCard: document.getElementById('frontal-diag-card'),
+      frontalDiagPill: document.getElementById('frontal-diag-pill'),
+      frontalDiagTitle: document.getElementById('frontal-diag-title'),
+      frontalDiagRange: document.getElementById('frontal-diag-range'),
+      frontalDiagAngle: document.getElementById('frontal-diag-angle'),
+      diagD1Badge: document.getElementById('diag-d1-badge'),
+      diagD1Text: document.getElementById('diag-d1-text'),
+      diagAvfBadge: document.getElementById('diag-avf-badge'),
+      diagAvfText: document.getElementById('diag-avf-text'),
+      diagD2Box: document.getElementById('diag-d2-box'),
+      diagD2Badge: document.getElementById('diag-d2-badge'),
+      diagD2Text: document.getElementById('diag-d2-text'),
+      frontalClinicalNote: document.getElementById('frontal-clinical-note'),
+
+      horizDiagCard: document.getElementById('horiz-diag-card'),
+      horizDiagPill: document.getElementById('horiz-diag-pill'),
+      horizDiagTitle: document.getElementById('horiz-diag-title'),
+      horizDiagRange: document.getElementById('horiz-diag-range'),
+      horizDiagAngle: document.getElementById('horiz-diag-angle'),
+      v1DominantAlert: document.getElementById('v1-dominant-alert'),
+      sokolowAlert: document.getElementById('sokolow-alert'),
+      sokolowText: document.getElementById('sokolow-text'),
+      rProgressionSummary: document.getElementById('r-progression-summary'),
+      v1V6MiniStrip: document.getElementById('v1-v6-mini-strip'),
+      horizClinicalNote: document.getElementById('horiz-clinical-note'),
+
+      // 12 Derivações + Tira DII
+      colBipolars: document.getElementById('col-bipolars'),
+      colAugmented: document.getElementById('col-augmented'),
+      colPrecordialRight: document.getElementById('col-precordial-right'),
+      colPrecordialLeft: document.getElementById('col-precordial-left'),
+      rhythmStripSvgContainer: document.getElementById('rhythm-strip-svg-container'),
+      rhythmStripCalLabel: document.getElementById('rhythm-strip-cal-label'),
+
+      // Compasso & Monitor
+      ecgCanvasWrapper: document.getElementById('ecg-canvas-wrapper'),
+      caliperOverlay: document.getElementById('caliper-overlay'),
+      caliperPin1: document.getElementById('caliper-pin-1'),
+      caliperPin2: document.getElementById('caliper-pin-2'),
+      caliperMm: document.getElementById('caliper-mm'),
+      caliperMs: document.getElementById('caliper-ms'),
+      caliperBpm: document.getElementById('caliper-bpm'),
+      btnToggleCaliper: document.getElementById('btn-toggle-caliper'),
+      caliperBtnLabel: document.getElementById('caliper-btn-label'),
+      btnToggleLive: document.getElementById('btn-toggle-live'),
+      liveDot: document.getElementById('live-dot'),
+
+      // Quiz
+      quizPoolCount: document.getElementById('quiz-pool-count'),
+      quizSetupError: document.getElementById('quiz-setup-error'),
+      quizQuestionBadge: document.getElementById('quiz-question-badge'),
+      quizScoreDisplay: document.getElementById('quiz-score-display'),
+      quizAnamnesisCard: document.getElementById('quiz-anamnesis-card'),
+      quizVitalsBar: document.getElementById('quiz-vitals-bar'),
+      quizAnamnesisText: document.getElementById('quiz-anamnesis-text'),
+      quizStagesContainer: document.getElementById('quiz-stages-container'),
+      quizFeedbackBox: document.getElementById('quiz-feedback-box'),
+      btnSubmitQuiz: document.getElementById('btn-submit-quiz'),
+      btnNextQuiz: document.getElementById('btn-next-quiz'),
+
+      toastNotification: document.getElementById('toast-notification'),
+      toastMessage: document.getElementById('toast-message'),
+    };
+
+    /**
+     * ============================================================================
+     * FUNÇÕES AUXILIARES E GEOMETRIA
+     * ============================================================================
+     */
+    function showToast(msg) {
+      dom.toastMessage.textContent = msg;
+      dom.toastNotification.classList.remove('hidden');
+      dom.toastNotification.classList.add('flex');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        dom.toastNotification.classList.add('hidden');
+        dom.toastNotification.classList.remove('flex');
+      }, 2800);
+    }
+
+    function formatDeg(deg) {
+      const r = Math.round(deg);
+      if (r === 180 || r === -180) return '±180°';
+      if (r > 0) return `+${r}°`;
+      return `${r}°`;
+    }
+
+    function normalizeAngle(deg) {
+      let a = ((deg + 180) % 360 + 360) % 360 - 180;
+      if (a === -180 && deg > 0) a = 180;
+      return Math.round(a);
+    }
+
+    function getAngularDiff(a, b) {
+      let diff = Math.abs(a - b) % 360;
+      if (diff > 180) diff = 360 - diff;
+      return diff;
+    }
+
+    function polarToCartesian(cx, cy, r, angleDeg) {
+      const rad = (angleDeg * Math.PI) / 180;
+      return {
+        x: cx + r * Math.cos(rad),
+        y: cy + r * Math.sin(rad),
+      };
+    }
+
+    function describeSector(cx, cy, r, startDeg, endDeg) {
+      const start = polarToCartesian(cx, cy, r, startDeg);
+      const end = polarToCartesian(cx, cy, r, endDeg);
+      let sweep = endDeg - startDeg;
+      if (sweep < 0) sweep += 360;
+      const largeArcFlag = sweep > 180 ? 1 : 0;
+      return [
+        `M ${cx} ${cy}`,
+        `L ${start.x.toFixed(2)} ${start.y.toFixed(2)}`,
+        `A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`,
+        'Z',
+      ].join(' ');
+    }
+
+    function getActiveCase() {
+      if (state.activeTab === 'quiz' && state.quizStarted && state.quizCurrentCase) {
+        return state.quizCurrentCase;
+      }
+      return CLINICAL_CASES.find((c) => c.id === state.activeCaseId) || CLINICAL_CASES[0];
+    }
+
+    function isQuizBlindActive() {
+      return state.activeTab === 'quiz' && state.quizStarted && !state.quizSubmitted;
+    }
+
+    /**
+     * ============================================================================
+     * INICIALIZAÇÃO EXATA DOS PLANOS FRONTAL E HORIZONTAL ORIGINAIS
+     * ============================================================================
+     */
+    function initStaticCircles() {
+      // 1. Zonas do Plano Frontal
+      const frontalZones = [
+        { start: -30,  end: 90,   fill: '#10b981', opacity: 0.14 },
+        { start: -90,  end: -30,  fill: '#f59e0b', opacity: 0.14 },
+        { start: 90,   end: 180,  fill: '#3b82f6', opacity: 0.13 },
+        { start: -180, end: -90,  fill: '#f43f5e', opacity: 0.13 },
+      ];
+      dom.frontalZones.innerHTML = frontalZones
+        .map((z) => `<path d="${describeSector(CX, CY, R_OUTER, z.start, z.end)}" fill="${z.fill}" fill-opacity="${z.opacity}" />`)
+        .join('');
+
+      // Grade do Plano Frontal
+      let fGrid = `
+        <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="none" stroke="#cbd5e1" stroke-width="1.5" />
+        <circle cx="${CX}" cy="${CY}" r="${R_OUTER * 0.65}" fill="none" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="3 3" />
+      `;
+      for (let deg = -180; deg < 180; deg += 15) {
+        const major = deg % 30 === 0;
+        const p1 = polarToCartesian(CX, CY, major ? R_OUTER - 8 : R_OUTER - 4, deg);
+        const p2 = polarToCartesian(CX, CY, R_OUTER, deg);
+        fGrid += `<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${major ? '#94a3b8' : '#cbd5e1'}" stroke-width="${major ? 1.3 : 0.9}" />`;
+      }
+      dom.frontalGrid.innerHTML = fGrid;
+
+      // 2. Zonas do Plano Horizontal (Faixa fisiológica: -45° a +15°)
+      dom.horizontalZones.innerHTML = `
+        <path d="${describeSector(CX, CY, R_OUTER, -45, 15)}" fill="#14b8a6" fill-opacity="0.16" />
+        <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="none" stroke="#cbd5e1" stroke-width="1.5" />
+      `;
+
+      // 3. Corte Anatômico Esquemático do Tórax (Exato como no site original)
+      dom.horizontalAnatomy.innerHTML = `
+        <ellipse cx="${CX}" cy="${CY}" rx="154" ry="126" fill="#f8fafc" fill-opacity="0.45" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3" />
+
+        <g transform="translate(${CX}, 122)">
+          <rect x="-16" y="-11" width="32" height="20" rx="6" fill="#e2e8f0" stroke="#64748b" stroke-width="1.3" />
+          <circle cx="0" cy="-1" r="4" fill="#94a3b8" />
+          <text x="0" y="-17" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" font-weight="800" fill="#475569" letter-spacing="0.06em">POSTERIOR (COLUNA)</text>
+        </g>
+
+        <g transform="translate(${CX}, 376)">
+          <rect x="-20" y="-6" width="40" height="12" rx="5" fill="#e2e8f0" stroke="#64748b" stroke-width="1.3" />
+          <text x="0" y="19" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" font-weight="800" fill="#475569" letter-spacing="0.06em">ANTERIOR (ESTERNO)</text>
+        </g>
+
+        <text x="86" y="${CY - 8}" text-anchor="start" font-family="Inter, sans-serif" font-size="9" font-weight="800" fill="#64748b">DIREITA</text>
+        <text x="414" y="${CY - 8}" text-anchor="end" font-family="Inter, sans-serif" font-size="9" font-weight="800" fill="#64748b">ESQUERDA</text>
+
+        <g transform="translate(${CX + 12}, ${CY + 6}) rotate(-28)">
+          <ellipse cx="0" cy="0" rx="56" ry="38" fill="#ffffff" fill-opacity="0.72" stroke="#94a3b8" stroke-width="1.4" />
+          <path d="M -42 -4 Q -6 36, 44 14 Q 10 38, -36 22 Z" fill="#fda4af" fill-opacity="0.38" />
+          <path d="M -22 -24 Q 24 -36, 52 -4 Q 22 -22, -18 -12 Z" fill="#818cf8" fill-opacity="0.35" />
+          <line x1="-32" y1="-6" x2="42" y2="8" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 2" />
+        </g>
+
+        <text x="${CX - 4}" y="${CY + 32}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" font-weight="800" fill="#be123c" fill-opacity="0.75">VD</text>
+        <text x="${CX + 34}" y="${CY - 14}" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" font-weight="800" fill="#3730a3" fill-opacity="0.8">VE</text>
+      `;
+    }
+
+    function renderPlaneCircle(options) {
+      const {
+        leads,
+        selectedLeadId,
+        qrsAngle,
+        leadsContainer,
+        projectionContainer,
+        vectorContainer,
+        labelsContainer,
+        vectorColor,
+        markerId,
+        accentColor,
+        selectCallback,
+      } = options;
+
+      let linesHtml = '';
+      let labelsHtml = '';
+
+      leads.forEach((lead) => {
+        const isSelected = lead.id === selectedLeadId;
+        const posPt = polarToCartesian(CX, CY, R_OUTER, lead.posAngle);
+        const negPt = polarToCartesian(CX, CY, R_OUTER, lead.negAngle);
+        const stroke = isSelected ? accentColor : '#64748b';
+
+        linesHtml += `
+          <line x1="${CX}" y1="${CY}" x2="${negPt.x.toFixed(1)}" y2="${negPt.y.toFixed(1)}"
+            stroke="${stroke}" stroke-width="${isSelected ? 1.6 : 1}" stroke-dasharray="4 4" stroke-opacity="${isSelected ? 0.65 : 0.32}" />
+          <line x1="${CX}" y1="${CY}" x2="${posPt.x.toFixed(1)}" y2="${posPt.y.toFixed(1)}"
+            stroke="${stroke}" stroke-width="${isSelected ? 2.5 : 1.3}" stroke-opacity="${isSelected ? 1 : 0.58}" />
+          <circle cx="${posPt.x.toFixed(1)}" cy="${posPt.y.toFixed(1)}" r="${isSelected ? 4.5 : 3}" fill="${stroke}" />
+        `;
+
+        const lblPt = polarToCartesian(CX, CY, R_LABEL, lead.posAngle);
+        const boxW = 64;
+        const boxH = 24;
+
+        labelsHtml += `
+          <g class="cursor-pointer" data-lead-btn="${lead.id}" role="button" tabindex="0">
+            <rect
+              x="${(lblPt.x - boxW / 2).toFixed(1)}"
+              y="${(lblPt.y - boxH / 2).toFixed(1)}"
+              width="${boxW}"
+              height="${boxH}"
+              rx="7"
+              fill="${isSelected ? accentColor : '#ffffff'}"
+              stroke="${isSelected ? accentColor : '#cbd5e1'}"
+              stroke-width="${isSelected ? 1.8 : 1.2}"
+            />
+            <text
+              x="${lblPt.x.toFixed(1)}"
+              y="${lblPt.y.toFixed(1)}"
+              text-anchor="middle"
+              dominant-baseline="central"
+              font-family="Inter, sans-serif"
+              font-size="10.5"
+              font-weight="700"
+              fill="${isSelected ? '#ffffff' : '#1e293b'}"
+            >${lead.name} <tspan font-family="JetBrains Mono, monospace" font-size="9.5" font-weight="600">${formatDeg(lead.posAngle)}</tspan></text>
+          </g>
+        `;
+      });
+
+      leadsContainer.innerHTML = linesHtml;
+      labelsContainer.innerHTML = labelsHtml;
+
+      labelsContainer.querySelectorAll('[data-lead-btn]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectCallback(el.getAttribute('data-lead-btn'));
+        });
+      });
+
+      const visualLen = Math.min(R_OUTER - 12, Math.max(82, R_VECTOR_BASE * (0.65 + 0.35 * state.voltageScale)));
+      const qrsTip = polarToCartesian(CX, CY, visualLen, qrsAngle);
+
+      const activeLead = leads.find((l) => l.id === selectedLeadId) || leads[0];
+      const perp1 = polarToCartesian(CX, CY, R_OUTER - 6, normalizeAngle(activeLead.posAngle - 90));
+      const perp2 = polarToCartesian(CX, CY, R_OUTER - 6, normalizeAngle(activeLead.posAngle + 90));
+
+      const diffDeg = getAngularDiff(qrsAngle, activeLead.posAngle);
+      const cosVal = Math.cos((diffDeg * Math.PI) / 180);
+      const projLen = visualLen * cosVal;
+      const projTip = polarToCartesian(CX, CY, projLen, activeLead.posAngle);
+      const isIso = Math.abs(cosVal) < 0.05;
+      const projColor = isIso ? '#64748b' : cosVal > 0 ? '#059669' : '#e11d48';
+
+      let projHtml = `
+        <line x1="${perp1.x.toFixed(1)}" y1="${perp1.y.toFixed(1)}" x2="${perp2.x.toFixed(1)}" y2="${perp2.y.toFixed(1)}"
+          stroke="${accentColor}" stroke-width="1.5" stroke-dasharray="3 4" stroke-opacity="0.72" />
+        <text x="${perp1.x.toFixed(1)}" y="${perp1.y.toFixed(1)}" dy="-5" text-anchor="middle"
+          font-family="JetBrains Mono, monospace" font-size="9" font-weight="700" fill="${accentColor}">90°</text>
+      `;
+
+      if (!isIso) {
+        projHtml += `
+          <line x1="${qrsTip.x.toFixed(1)}" y1="${qrsTip.y.toFixed(1)}" x2="${projTip.x.toFixed(1)}" y2="${projTip.y.toFixed(1)}"
+            stroke="${accentColor}" stroke-width="1.5" stroke-dasharray="4 3" />
+          <line x1="${CX}" y1="${CY}" x2="${projTip.x.toFixed(1)}" y2="${projTip.y.toFixed(1)}"
+            stroke="${projColor}" stroke-width="5" stroke-linecap="round" stroke-opacity="0.85" />
+          <circle cx="${projTip.x.toFixed(1)}" cy="${projTip.y.toFixed(1)}" r="4.2" fill="${projColor}" stroke="#ffffff" stroke-width="1.5" />
+        `;
+      }
+      projectionContainer.innerHTML = projHtml;
+
+      vectorContainer.innerHTML = `
+        <circle cx="${qrsTip.x.toFixed(1)}" cy="${qrsTip.y.toFixed(1)}" r="15" fill="${vectorColor}" class="vector-halo pointer-events-none" />
+        <line x1="${CX}" y1="${CY}" x2="${qrsTip.x.toFixed(1)}" y2="${qrsTip.y.toFixed(1)}"
+          stroke="${vectorColor}" stroke-width="4.2" stroke-linecap="round" marker-end="url(#${markerId})" />
+        <circle cx="${CX}" cy="${CY}" r="5" fill="#0f172a" stroke="#ffffff" stroke-width="1.6" />
+        <circle cx="${qrsTip.x.toFixed(1)}" cy="${qrsTip.y.toFixed(1)}" r="24" fill="transparent" class="cursor-grab active:cursor-grabbing" />
+      `;
+    }
+
+    /**
+     * ============================================================================
+     * CÁLCULO MORFOLÓGICO E RENDERIZAÇÃO EM PAPEL MILIMETRADO (12 DERIVAÇÕES + DII)
+     * ============================================================================
+     */
+    function computeLeadMetrics(lead) {
+      const activeCase = getActiveCase();
+      const refAngle = lead.plane === 'frontal' ? state.frontalAngle : state.horizontalAngle;
+      const diffDeg = getAngularDiff(refAngle, lead.posAngle);
+      const rawCos = Math.cos((diffDeg * Math.PI) / 180);
+      const cosVal = Math.abs(rawCos) < 0.005 ? 0 : rawCos;
+
+      const baseNominalMm = lead.plane === 'frontal' ? 15.0 : 19.0;
+      const maxSpanMm = baseNominalMm * state.voltageScale;
+      const norm = (cosVal + 1) / 2;
+
+      let qMm = 0;
+      let rMm = 0;
+      let sMm = 0;
+
+      if (lead.isLateral && cosVal > 0.45 && activeCase.blockType !== 'lbbb') {
+        qMm = Math.min(2.2, 1.4 * cosVal * state.voltageScale);
+      }
+
+      if (cosVal <= -0.82 && !lead.isRightAnt) {
+        rMm = 0.4 * state.voltageScale;
+        sMm = maxSpanMm * Math.abs(cosVal);
+      } else if (lead.isRightAnt && cosVal < 0) {
+        rMm = Math.max(1.2, (1.5 + 4.5 * (1 + cosVal)) * state.voltageScale);
+        sMm = rMm + maxSpanMm * Math.abs(cosVal);
+      } else {
+        rMm = Math.max(0.8, maxSpanMm * Math.pow(norm, 1.12));
+        sMm = Math.max(0.4, maxSpanMm * Math.pow(1 - norm, 1.18));
+      }
+
+      // Ajustes morfológicos específicos de bloqueios de ramo
+      if (activeCase.blockType === 'rbbb') {
+        if (lead.id === 'V1' || lead.id === 'V2') {
+          rMm = 4.5 * state.voltageScale;
+          sMm = 5.0 * state.voltageScale;
+        } else if (lead.id === 'DI' || lead.id === 'aVL' || lead.id === 'V5' || lead.id === 'V6') {
+          sMm = Math.max(sMm, 6.5 * state.voltageScale);
+        }
+      } else if (activeCase.blockType === 'lbbb') {
+        if (lead.id === 'V1' || lead.id === 'V2' || lead.id === 'V3') {
+          rMm = 0.6;
+          sMm = 17.5 * state.voltageScale;
+        } else if (lead.id === 'DI' || lead.id === 'aVL' || lead.id === 'V5' || lead.id === 'V6') {
+          qMm = 0;
+          rMm = 16.5 * state.voltageScale;
+          sMm = 0.6;
+        }
+      }
+
+      const netMm = rMm - (qMm + sMm);
+      const stShiftMm = (activeCase.stOverrides && activeCase.stOverrides[lead.id]) || 0;
+
+      let morphology = 'RS';
+      if (activeCase.blockType === 'rbbb' && (lead.id === 'V1' || lead.id === 'V2')) {
+        morphology = "rsR' (BRD)";
+      } else if (activeCase.blockType === 'lbbb' && (lead.id === 'V5' || lead.id === 'V6' || lead.id === 'DI')) {
+        morphology = 'R Entalhada';
+      } else if (rMm < 1.0 && sMm >= 4.0) {
+        morphology = 'QS';
+      } else if (Math.abs(rMm - sMm) <= Math.max(1.8, 0.14 * maxSpanMm)) {
+        morphology = 'RS (Isodifásico)';
+      } else if (rMm > sMm) {
+        if (qMm >= 0.8 && sMm < 2.2) morphology = 'qR';
+        else if (sMm < 2.0) morphology = 'R';
+        else morphology = 'Rs';
+      } else {
+        morphology = rMm >= 1.2 ? 'rS' : 'QS';
+      }
+
+      return { diffDeg, cosVal, qMm, rMm, sMm, netMm, stShiftMm, morphology };
+    }
+
+    /**
+     * Gera o traçado contínuo de múltiplos batimentos em papel milimetrado calibrado
+     */
+    function buildMultiBeatPath(lead, metrics, totalWidthPx, baseY, startX) {
+      const activeCase = getActiveCase();
+      const pxPerMm = 3.5;
+      const speedMult = state.paperSpeed === 50 ? 2.0 : 1.0;
+      const gainMult = state.paperGain;
+
+      const clampY = (y) => Math.max(6, Math.min(99, y));
+      const mmToY = (mm) => clampY(baseY - mm * pxPerMm * gainMult);
+
+      const hr = activeCase.hr || 72;
+      // 25 mm/s -> 1 segundo = 25 mm = 87.5 px
+      const pxPerSec = 25 * pxPerMm * speedMult;
+      const baseRRPx = (60 / hr) * pxPerSec;
+
+      const rhythm = activeCase.rhythmType || 'sinus';
+      const qrsMs = activeCase.qrsWidthMs || 85;
+      const qrsWidthPx = Math.max(7, (qrsMs / 1000) * pxPerSec);
+      const prMs = activeCase.prMs || 160;
+
+      let d = `M ${startX.toFixed(1)} ${baseY}`;
+      let cursorX = startX + 8;
+      let beatIdx = 0;
+
+      // Padrão irregular determinístico para Fibrilação Atrial
+      const afibFactors = [0.76, 1.24, 0.88, 1.35, 0.72, 1.12, 0.94, 1.30, 0.80, 1.18];
+
+      while (cursorX < totalWidthPx - 14 && beatIdx < 24) {
+        let rrPx = baseRRPx;
+        let currentPrMs = prMs;
+        let droppedQrs = false;
+        let showP = true;
+
+        if (rhythm === 'afib') {
+          rrPx = baseRRPx * afibFactors[beatIdx % afibFactors.length];
+          showP = false;
+        } else if (rhythm === 'flutter') {
+          showP = false;
+        } else if (rhythm === 'svt' || rhythm === 'vt' || rhythm === 'avb3') {
+          showP = false;
+        } else if (rhythm === 'wenckebach') {
+          const cyclePos = beatIdx % 4;
+          if (cyclePos === 0) currentPrMs = 175;
+          else if (cyclePos === 1) currentPrMs = 245;
+          else if (cyclePos === 2) currentPrMs = 315;
+          else droppedQrs = true;
+        }
+
+        const prPx = Math.max(10, (currentPrMs / 1000) * pxPerSec);
+        const pWidthPx = Math.max(7, 0.08 * pxPerSec);
+
+        // Linha de base / ondas F de Flutter / fibrilação
+        if (rhythm === 'flutter') {
+          const sawStep = (0.20 * pxPerSec) / 2; // 300 bpm = 1 onda a cada 0.20s
+          const sawAmp = (lead.id === 'DII' || lead.id === 'DIII' || lead.id === 'aVF') ? -2.2 : 1.3;
+          const sawEnd = Math.min(totalWidthPx - 6, cursorX + rrPx - qrsWidthPx - 4);
+          let sx = cursorX;
+          while (sx + sawStep < sawEnd) {
+            d += ` L ${(sx + sawStep * 0.4).toFixed(1)} ${mmToY(sawAmp).toFixed(1)} L ${(sx + sawStep).toFixed(1)} ${mmToY(0.4).toFixed(1)}`;
+            sx += sawStep;
+          }
+          cursorX = sx;
+        } else if (rhythm === 'afib') {
+          const fibEnd = Math.min(totalWidthPx - 6, cursorX + rrPx - qrsWidthPx - 4);
+          let fx = cursorX;
+          let toggle = 1;
+          while (fx + 4 < fibEnd) {
+            d += ` L ${(fx + 2).toFixed(1)} ${mmToY(0.35 * toggle).toFixed(1)}`;
+            toggle *= -1;
+            fx += 4;
+          }
+          cursorX = fx;
+        } else if (rhythm === 'avb3') {
+          // Dissociação AV: desenha ondas P independentes a 90 bpm
+          const pPeriod = (60 / 90) * pxPerSec;
+          const beatEnd = Math.min(totalWidthPx - 6, cursorX + rrPx);
+          let pxPos = cursorX;
+          while (pxPos + pWidthPx < beatEnd - qrsWidthPx - 4) {
+            const pAmp = 1.5 * lead.pPol;
+            d += ` L ${pxPos.toFixed(1)} ${baseY} Q ${(pxPos + pWidthPx / 2).toFixed(1)} ${mmToY(pAmp).toFixed(1)}, ${(pxPos + pWidthPx).toFixed(1)} ${baseY}`;
+            pxPos += pPeriod;
+          }
+          cursorX = Math.max(cursorX + 6, beatEnd - qrsWidthPx - 18);
+        }
+
+        // Onda P sinusal
+        if (showP) {
+          let pAmp = 1.6 * lead.pPol;
+          if (rhythm === 'hyperk') pAmp *= 0.35;
+          if (cursorX + pWidthPx < totalWidthPx - 6) {
+            d += ` L ${cursorX.toFixed(1)} ${baseY} Q ${(cursorX + pWidthPx / 2).toFixed(1)} ${mmToY(pAmp).toFixed(1)}, ${(cursorX + pWidthPx).toFixed(1)} ${baseY}`;
+          }
+          cursorX += prPx;
+        }
+
+        // Se Mobitz I no 4º batimento, onda P foi bloqueada
+        if (droppedQrs) {
+          cursorX += rrPx * 0.75;
+          d += ` L ${Math.min(totalWidthPx - 4, cursorX).toFixed(1)} ${baseY}`;
+          beatIdx++;
+          continue;
+        }
+
+        if (cursorX + qrsWidthPx >= totalWidthPx - 6) break;
+
+        // Complexo QRS
+        const qX = cursorX + qrsWidthPx * 0.18;
+        const rX = cursorX + qrsWidthPx * 0.45;
+        const sX = cursorX + qrsWidthPx * 0.78;
+        const jX = cursorX + qrsWidthPx;
+
+        const qY = mmToY(-metrics.qMm);
+        const rY = mmToY(metrics.rMm);
+        const sY = mmToY(-metrics.sMm);
+        const stY = mmToY(metrics.stShiftMm);
+
+        if (activeCase.blockType === 'rbbb' && (lead.id === 'V1' || lead.id === 'V2')) {
+          // Padrão trifásico rsR'
+          const r1X = cursorX + qrsWidthPx * 0.25;
+          const sMidX = cursorX + qrsWidthPx * 0.50;
+          const r2X = cursorX + qrsWidthPx * 0.78;
+          d += ` L ${r1X.toFixed(1)} ${mmToY(3.2 * state.voltageScale).toFixed(1)}`;
+          d += ` L ${sMidX.toFixed(1)} ${mmToY(-4.2 * state.voltageScale).toFixed(1)}`;
+          d += ` L ${r2X.toFixed(1)} ${mmToY(8.2 * state.voltageScale).toFixed(1)}`;
+          d += ` L ${jX.toFixed(1)} ${stY.toFixed(1)}`;
+        } else if (activeCase.blockType === 'lbbb' && (lead.id === 'DI' || lead.id === 'aVL' || lead.id === 'V5' || lead.id === 'V6')) {
+          // Onda R larga e entalhada ("em torre")
+          const p1X = cursorX + qrsWidthPx * 0.32;
+          const notchX = cursorX + qrsWidthPx * 0.52;
+          const p2X = cursorX + qrsWidthPx * 0.74;
+          d += ` L ${p1X.toFixed(1)} ${mmToY(metrics.rMm * 0.95).toFixed(1)}`;
+          d += ` L ${notchX.toFixed(1)} ${mmToY(metrics.rMm * 0.76).toFixed(1)}`;
+          d += ` L ${p2X.toFixed(1)} ${mmToY(metrics.rMm).toFixed(1)}`;
+          d += ` L ${jX.toFixed(1)} ${stY.toFixed(1)}`;
+        } else {
+          d += ` L ${qX.toFixed(1)} ${qY.toFixed(1)} L ${rX.toFixed(1)} ${rY.toFixed(1)} L ${sX.toFixed(1)} ${sY.toFixed(1)} L ${jX.toFixed(1)} ${stY.toFixed(1)}`;
+        }
+
+        // Segmento ST e Onda T (+ Onda U na hipocalemia)
+        const stEndX = jX + Math.max(8, 0.08 * pxPerSec);
+        const tWidthPx = Math.max(14, 0.16 * pxPerSec);
+        let tMm = Math.abs(metrics.cosVal) < 0.08 ? 1.2 : 3.2 * metrics.cosVal * Math.min(1.3, state.voltageScale);
+
+        if (metrics.stShiftMm >= 2.0) {
+          tMm = Math.max(tMm, metrics.stShiftMm + 2.2);
+        } else if (metrics.stShiftMm <= -1.0) {
+          tMm = -2.2;
+        }
+
+        if (rhythm === 'hyperk') {
+          tMm = lead.id === 'aVR' ? -5.5 : 7.8; // Onda T alta e apiculada em tenda
+        } else if (rhythm === 'hypok') {
+          tMm = -0.8;
+        }
+
+        const tPeakX = stEndX + tWidthPx * 0.55;
+        const tEndX = stEndX + tWidthPx;
+
+        if (tEndX < totalWidthPx - 4) {
+          d += ` L ${stEndX.toFixed(1)} ${stY.toFixed(1)}`;
+          d += ` Q ${tPeakX.toFixed(1)} ${mmToY(tMm + metrics.stShiftMm * 0.4).toFixed(1)}, ${tEndX.toFixed(1)} ${baseY}`;
+
+          // Onda U proeminente na Hipocalemia
+          if (rhythm === 'hypok' && (lead.id === 'V2' || lead.id === 'V3' || lead.id === 'V4' || lead.id === 'DII')) {
+            const uWidth = Math.max(10, 0.10 * pxPerSec);
+            if (tEndX + uWidth < totalWidthPx - 4) {
+              d += ` Q ${(tEndX + uWidth / 2).toFixed(1)} ${mmToY(2.8).toFixed(1)}, ${(tEndX + uWidth).toFixed(1)} ${baseY}`;
+            }
+          }
+        }
+
+        cursorX += rrPx;
+        beatIdx++;
+      }
+
+      d += ` L ${totalWidthPx - 4} ${baseY}`;
+      return d;
+    }
+
+    function buildMillimeterEcgSvg(lead, metrics, widthPx = 210, heightPx = 105, includeCal = false) {
+      const pxPerMm = 3.5;
+      const base = heightPx / 2;
+      const calHeightPx = 10 * pxPerMm * state.paperGain;
+      const calTopY = Math.max(8, base - calHeightPx);
+
+      const calPath = includeCal
+        ? `M 3 ${base} L 7 ${base} L 7 ${calTopY.toFixed(1)} L 16 ${calTopY.toFixed(1)} L 16 ${base} `
+        : '';
+      const startX = includeCal ? 18 : 4;
+      const wavePath = calPath + buildMultiBeatPath(lead, metrics, widthPx, base, startX);
+
+      // Cursor de varredura do Monitor ao Vivo
+      const sweepX = ((state.liveSweepPct / 100) * widthPx).toFixed(1);
+      const liveSweepSvg = state.liveMonitor
+        ? `
+          <rect x="${Math.max(0, sweepX - 10)}" y="0" width="12" height="${heightPx}" fill="#10b981" fill-opacity="0.14" />
+          <line x1="${sweepX}" y1="0" x2="${sweepX}" y2="${heightPx}" stroke="#059669" stroke-width="1.6" />
+        `
+        : '';
+
+      return `
+        <svg viewBox="0 0 ${widthPx} ${heightPx}" class="w-full h-[96px] rounded-xl border border-rose-200/90 bg-[#fffafa] overflow-hidden">
+          <defs>
+            <pattern id="g1-${lead.id}-${widthPx}" width="3.5" height="3.5" patternUnits="userSpaceOnUse">
+              <path d="M 3.5 0 L 0 0 0 3.5" fill="none" stroke="#fecdd3" stroke-width="0.55" />
+            </pattern>
+            <pattern id="g5-${lead.id}-${widthPx}" width="17.5" height="17.5" patternUnits="userSpaceOnUse">
+              <rect width="17.5" height="17.5" fill="url(#g1-${lead.id}-${widthPx})" />
+              <path d="M 17.5 0 L 0 0 0 17.5" fill="none" stroke="#fda4af" stroke-width="0.95" />
+            </pattern>
+          </defs>
+          <rect width="${widthPx}" height="${heightPx}" fill="url(#g5-${lead.id}-${widthPx})" />
+          <line x1="0" y1="${base}" x2="${widthPx}" y2="${base}" stroke="#f43f5e" stroke-opacity="0.2" stroke-width="0.75" stroke-dasharray="2 2" />
+          <path d="${wavePath}" fill="none" stroke="#0f172a" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" />
+          ${liveSweepSvg}
+        </svg>
+      `;
+    }
+
+    function renderLeadCardHtml(lead) {
+      const blindQuiz = isQuizBlindActive();
+      const isSelected =
+        !blindQuiz &&
+        state.activeTab === 'explore' &&
+        ((lead.plane === 'frontal' && lead.id === state.selectedFrontalId) ||
+          (lead.plane === 'horizontal' && lead.id === state.selectedHorizontalId));
+
+      const metrics = computeLeadMetrics(lead);
+      const isFrontal = lead.plane === 'frontal';
+
+      const selectedClasses = isSelected
+        ? isFrontal
+          ? 'border-rose-500 ring-2 ring-rose-500/20 shadow-md'
+          : 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
+        : 'border-slate-200 hover:border-slate-300 shadow-sm';
+
+      let morphBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+      if (metrics.stShiftMm >= 1.5) {
+        morphBadgeClass = 'bg-rose-100 text-rose-800 border-rose-300';
+      } else if (metrics.morphology.startsWith('RS')) {
+        morphBadgeClass = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      } else if (metrics.netMm > 1.2) {
+        morphBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      } else if (metrics.netMm < -1.2) {
+        morphBadgeClass = 'bg-rose-100 text-rose-800 border-rose-200';
+      }
+
+      const netFormatted = `${metrics.netMm >= 0 ? '+' : ''}${metrics.netMm.toFixed(1)} mm`;
+      const cosFormatted = `${metrics.cosVal >= 0 ? '+' : ''}${metrics.cosVal.toFixed(2)}`;
+      const hasCal = lead.id === 'DI' || lead.id === 'DII' || lead.id === 'DIII';
+
+      // No Modo Quiz ativo (antes de responder), NÃO mostra graus, morfologia ou pistas!
+      if (blindQuiz) {
+        return `
+          <article class="rounded-2xl bg-white p-3.5 border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between gap-1.5 mb-2">
+              <span class="text-sm font-extrabold text-slate-900">${lead.name}</span>
+            </div>
+            ${buildMillimeterEcgSvg(lead, metrics, 210, 105, hasCal)}
+          </article>
+        `;
+      }
+
+      return `
+        <article
+          data-lead-card="${lead.id}"
+          data-lead-plane="${lead.plane}"
+          class="cursor-pointer rounded-2xl bg-white p-3.5 border transition-all ${selectedClasses}"
+        >
+          <div class="flex items-center justify-between gap-1.5 mb-2">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full ${isFrontal ? 'bg-rose-500' : 'bg-blue-500'}"></span>
+              <span class="text-sm font-extrabold text-slate-900">${lead.name}</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[11px] font-semibold">
+                ${formatDeg(lead.posAngle)}
+              </span>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${morphBadgeClass}">
+              ${metrics.stShiftMm >= 1.5 ? `Supra +${metrics.stShiftMm.toFixed(1)} mm` : metrics.stShiftMm <= -1.0 ? `Infra ${metrics.stShiftMm.toFixed(1)} mm` : metrics.morphology}
+            </span>
+          </div>
+
+          ${buildMillimeterEcgSvg(lead, metrics, 210, 105, hasCal)}
+
+          <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span class="text-slate-500 truncate">${lead.region}</span>
+            <div class="flex items-center gap-1.5 font-mono shrink-0">
+              <span class="font-bold ${metrics.netMm > 1 ? 'text-emerald-700' : metrics.netMm < -1 ? 'text-rose-700' : 'text-slate-700'}">${netFormatted}</span>
+              <span class="text-slate-300">|</span>
+              <span class="text-slate-500">cos <strong class="text-slate-700">${cosFormatted}</strong></span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderAll12Leads() {
+      const allLeads = [...FRONTAL_LEADS, ...HORIZONTAL_LEADS];
+      const byCol = {
+        'col-bipolars': [],
+        'col-augmented': [],
+        'col-precordial-right': [],
+        'col-precordial-left': [],
+      };
+
+      allLeads.forEach((lead) => {
+        byCol[lead.col].push(renderLeadCardHtml(lead));
+      });
+
+      dom.colBipolars.innerHTML = byCol['col-bipolars'].join('');
+      dom.colAugmented.innerHTML = byCol['col-augmented'].join('');
+      dom.colPrecordialRight.innerHTML = byCol['col-precordial-right'].join('');
+      dom.colPrecordialLeft.innerHTML = byCol['col-precordial-left'].join('');
+
+      // Tira de Ritmo DII Longo (920 x 105)
+      const d2Lead = FRONTAL_LEADS[1];
+      const d2Metrics = computeLeadMetrics(d2Lead);
+      dom.rhythmStripSvgContainer.innerHTML = buildMillimeterEcgSvg(d2Lead, d2Metrics, 920, 105, true);
+      dom.rhythmStripCalLabel.textContent = `${state.paperSpeed} mm/s · ${(10 * state.paperGain).toFixed(0)} mm/mV`;
+
+      if (!isQuizBlindActive()) {
+        document.querySelectorAll('[data-lead-card]').forEach((card) => {
+          card.addEventListener('click', () => {
+            const id = card.getAttribute('data-lead-card');
+            const plane = card.getAttribute('data-lead-plane');
+            if (plane === 'frontal') state.selectedFrontalId = id;
+            else state.selectedHorizontalId = id;
+            updateAll();
+          });
+        });
+      }
+    }
+
+    /**
+     * ============================================================================
+     * DIAGNÓSTICO AUTOMÁTICO EM TEMPO REAL (EXPLORAR)
+     * ============================================================================
+     */
+    function classifyFrontalAxis(angle) {
+      if (angle >= -30 && angle <= 90) {
+        return {
+          key: 'normal',
+          title: 'Eixo Elétrico Normal',
+          pill: 'Plano Frontal · Fisiológico',
+          range: 'Referência: -30° a +90°',
+          cardCls: 'bg-emerald-50 border-emerald-200',
+          pillCls: 'bg-emerald-600 text-white',
+          titleCls: 'text-emerald-950',
+          rangeCls: 'text-emerald-800',
+          note: 'Vetor médio ventricular orientado para baixo e para a esquerda. Entre 0° e -30° ocorre horizontalização fisiológica (gestantes, brevilíneos); entre +60° e +90° ocorre verticalização (jovens longilíneos).',
+        };
+      }
+      if (angle >= -90 && angle < -30) {
+        return {
+          key: 'left',
+          title: 'Desvio do Eixo para a Esquerda',
+          pill: 'Plano Frontal · Desvio Esquerdo',
+          range: 'Faixa: além de -30° até -90°',
+          cardCls: 'bg-amber-50 border-amber-200',
+          pillCls: 'bg-amber-600 text-white',
+          titleCls: 'text-amber-950',
+          rangeCls: 'text-amber-800',
+          note: 'Principais causas: Bloqueio Divisional Anterossuperior (BDAS, geralmente além de -45°), Hipertrofia Ventricular Esquerda (HVE) e área eletricamente inativa de parede inferior.',
+        };
+      }
+      if (angle > 90 && angle <= 180) {
+        return {
+          key: 'right',
+          title: 'Desvio do Eixo para a Direita',
+          pill: 'Plano Frontal · Desvio Direito',
+          range: 'Faixa: além de +90° até +180°',
+          cardCls: 'bg-blue-50 border-blue-200',
+          pillCls: 'bg-blue-600 text-white',
+          titleCls: 'text-blue-950',
+          rangeCls: 'text-blue-800',
+          note: 'Principais causas: Sobrecarga Ventricular Direita (Cor Pulmonale, TEP, hipertensão pulmonar), Bloqueio Divisional Posteroinferior (BDPI) ou variante constitucional em jovens muito longilíneos.',
+        };
+      }
+      return {
+        key: 'extreme',
+        title: 'Desvio Extremo do Eixo',
+        pill: 'Plano Frontal · Terra de Ninguém',
+        range: 'Faixa: -90° a -180° (DI e aVF negativos)',
+        cardCls: 'bg-rose-50 border-rose-200',
+        pillCls: 'bg-rose-600 text-white',
+        titleCls: 'text-rose-950',
+        rangeCls: 'text-rose-800',
+        note: 'Altamente sugestivo de Taquicardia Ventricular (quando QRS largo), sobrecarga direita grave ou troca técnica de eletrodos nos membros superiores (braço direito/esquerdo).',
+      };
+    }
+
+    function classifyHorizontalAxis(angle) {
+      const v1Metrics = computeLeadMetrics(HORIZONTAL_LEADS[0]);
+      const isV1Dominant = v1Metrics.rMm > v1Metrics.sMm + 0.5;
+
+      if (isV1Dominant || (angle > 35 && angle <= 180)) {
+        return {
+          key: 'anterior',
+          title: 'Forças Anteriores Proeminentes (R > S em V1)',
+          shortBadge: 'Anteriorizado (R > S V1)',
+          pill: 'Plano Horizontal · Desvio Anterior',
+          range: 'Vetor apontando anteriormente (em direção a V1–V2)',
+          cardCls: 'bg-blue-50 border-blue-200',
+          pillCls: 'bg-blue-600 text-white',
+          titleCls: 'text-blue-950',
+          rangeCls: 'text-blue-800',
+          isV1Dominant: true,
+          note: 'A predominância de forças anteriores inverte o padrão precordial habitual, gerando ondas R altas em V1–V2 e ondas S profundas em V5–V6 — achado clássico da Sobrecarga Ventricular Direita (HVD).',
+        };
+      }
+
+      if (angle > 5 && angle <= 35) {
+        return {
+          key: 'early',
+          title: 'Transição Precordial Precoce (V1–V2)',
+          shortBadge: 'Precoce (V1–V2)',
+          pill: 'Plano Horizontal · Rotação Anti-horária',
+          range: 'A onda R iguala/supera a onda S já em V1 ou V2',
+          cardCls: 'bg-indigo-50 border-indigo-200',
+          pillCls: 'bg-indigo-600 text-white',
+          titleCls: 'text-indigo-950',
+          rangeCls: 'text-indigo-800',
+          isV1Dominant,
+          note: 'Ocorre quando o ventrículo esquerdo está anatomicamente rodado anteriormente (rotação anti-horária no eixo longitudinal), fazendo a zona de transição aparecer precocemente em V1–V2.',
+        };
+      }
+
+      if (angle >= -35 && angle <= 5) {
+        return {
+          key: 'normal',
+          title: 'Zona de Transição Normal (V3–V4)',
+          shortBadge: 'Normal (V3–V4)',
+          pill: 'Plano Horizontal · Fisiológico',
+          range: 'Progressão fisiológica de R com transição R ≈ S em V3 ou V4',
+          cardCls: 'bg-teal-50 border-teal-200',
+          pillCls: 'bg-teal-600 text-white',
+          titleCls: 'text-teal-950',
+          rangeCls: 'text-teal-800',
+          isV1Dominant: false,
+          note: 'A onda R cresce progressivamente de V1 (rS) até V5–V6 (qR), enquanto a onda S diminui gradualmente. A transição isoelétrica (R ≈ S) ocorre fisiologicamente em V3 ou V4.',
+        };
+      }
+
+      if (angle >= -95 && angle < -35) {
+        return {
+          key: 'late',
+          title: 'Transição Precordial Tardia (V5–V6)',
+          shortBadge: 'Tardia (V5–V6)',
+          pill: 'Plano Horizontal · Rotação Horária',
+          range: 'Persistência de ondas S profundas até V4–V5 (transição em V5/V6)',
+          cardCls: 'bg-purple-50 border-purple-200',
+          pillCls: 'bg-purple-600 text-white',
+          titleCls: 'text-purple-950',
+          rangeCls: 'text-purple-800',
+          isV1Dominant: false,
+          note: 'Observada na rotação horária do coração (DPOC/enfisema com rebaixamento diafragmático), na Hipertrofia Ventricular Esquerda (vetor desviado para trás) e no BDAS.',
+        };
+      }
+
+      return {
+        key: 'late',
+        title: 'Desvio Posterior Acentuado (S profunda V1–V6)',
+        shortBadge: 'Posterior Extremo',
+        pill: 'Plano Horizontal · Posterior',
+        range: 'Vetor apontando para trás e para a direita (-95° a -180°)',
+        cardCls: 'bg-rose-50 border-rose-200',
+        pillCls: 'bg-rose-600 text-white',
+        titleCls: 'text-rose-950',
+        rangeCls: 'text-rose-800',
+        isV1Dominant: false,
+        note: 'Ondas S predominantes em praticamente todas as derivações precordiais (padrão S1S2S3 ou enfisema pulmonar acentuado).',
+      };
+    }
+
+    function updateDiagnosticPanels() {
+      const activeCase = getActiveCase();
+
+      // Banner de Patologia Específica quando não for apenas "normal"
+      if (activeCase && activeCase.id !== 'normal') {
+        dom.pathologySummaryBanner.classList.remove('hidden');
+        dom.pathBannerCat.textContent = activeCase.catLabel;
+        dom.pathBannerTitle.textContent = activeCase.label;
+        dom.pathBannerHr.textContent = `FC: ${activeCase.hr} bpm`;
+        dom.pathBannerWall.textContent = activeCase.wallInfo;
+        dom.pathBannerEcg.textContent = activeCase.ecgCriteria;
+        dom.pathBannerClinical.textContent = activeCase.clinicalNote;
+      } else {
+        dom.pathologySummaryBanner.classList.add('hidden');
+      }
+
+      // Painel Frontal
+      const fInfo = classifyFrontalAxis(state.frontalAngle);
+      dom.frontalDiagCard.className = `rounded-xl p-4 border transition-colors ${fInfo.cardCls}`;
+      dom.frontalDiagPill.className = `inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider mb-1 ${fInfo.pillCls}`;
+      dom.frontalDiagPill.textContent = fInfo.pill;
+      dom.frontalDiagTitle.className = `text-lg font-extrabold ${fInfo.titleCls}`;
+      dom.frontalDiagTitle.textContent = fInfo.title;
+      dom.frontalDiagRange.className = `text-xs font-medium mt-0.5 ${fInfo.rangeCls}`;
+      dom.frontalDiagRange.textContent = fInfo.range;
+      dom.frontalDiagAngle.textContent = formatDeg(state.frontalAngle);
+      dom.frontalClinicalNote.textContent = fInfo.note;
+
+      const cosD1 = Math.cos((getAngularDiff(state.frontalAngle, 0) * Math.PI) / 180);
+      const cosAvf = Math.cos((getAngularDiff(state.frontalAngle, 90) * Math.PI) / 180);
+      const cosD2 = Math.cos((getAngularDiff(state.frontalAngle, 60) * Math.PI) / 180);
+
+      const badgeFor = (c) => {
+        if (Math.abs(c) < 0.05) return { txt: 'ISODIFÁSICO', cls: 'bg-slate-200 text-slate-800', s: 0 };
+        return c > 0
+          ? { txt: 'POSITIVO', cls: 'bg-emerald-100 text-emerald-800', s: 1 }
+          : { txt: 'NEGATIVO', cls: 'bg-rose-100 text-rose-800', s: -1 };
+      };
+
+      const b1 = badgeFor(cosD1);
+      const bAvf = badgeFor(cosAvf);
+      const bD2 = badgeFor(cosD2);
+
+      dom.diagD1Badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${b1.cls}`;
+      dom.diagD1Badge.textContent = b1.txt;
+      dom.diagD1Text.textContent =
+        b1.s >= 0
+          ? 'Vetor aponta para a metade esquerda (-90° a +90°).'
+          : 'Vetor aponta para a metade direita (além de ±90°): indica desvio direito ou extremo.';
+
+      dom.diagAvfBadge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${bAvf.cls}`;
+      dom.diagAvfBadge.textContent = bAvf.txt;
+      if (b1.s >= 0 && bAvf.s >= 0) {
+        dom.diagAvfText.textContent = 'DI e aVF positivos definem quadrante inferior esquerdo (0° a +90°): Eixo Normal.';
+      } else if (b1.s > 0 && bAvf.s < 0) {
+        dom.diagAvfText.textContent = 'DI positivo + aVF negativo: vetor entre 0° e -90°. Necessário avaliar DII.';
+      } else if (b1.s < 0 && bAvf.s >= 0) {
+        dom.diagAvfText.textContent = 'DI negativo + aVF positivo confirma Desvio para a Direita (+90° a +180°).';
+      } else {
+        dom.diagAvfText.textContent = 'DI negativo + aVF negativo confirma Desvio Extremo (-90° a -180°).';
+      }
+
+      const d2Critical = b1.s > 0 && bAvf.s < 0;
+      dom.diagD2Box.className = `p-2.5 rounded-xl border flex items-start gap-2.5 ${
+        d2Critical ? 'bg-indigo-50/70 border-indigo-200' : 'bg-slate-50 border-slate-200/80'
+      }`;
+      dom.diagD2Badge.className = `px-2 py-0.5 rounded text-[10px] font-bold ${bD2.cls}`;
+      dom.diagD2Badge.textContent = bD2.txt;
+
+      if (d2Critical) {
+        dom.diagD2Text.textContent =
+          bD2.s >= 0
+            ? 'Como DII (+60°) ainda é positivo, o eixo está entre 0° e -30° (Normal).'
+            : 'Como DII (+60°) tornou-se negativo, o vetor ultrapassou -30° (Desvio Esquerdo).';
+      } else if (fInfo.key === 'right' && bD2.s > 0) {
+        dom.diagD2Text.textContent = `Em ${formatDeg(state.frontalAngle)}, DII (+60°) permanece positivo porque a diferença angular até +60° é menor que 90°.`;
+      } else {
+        dom.diagD2Text.textContent = 'Atua como confirmação vetorial neste quadrante.';
+      }
+
+      // Painel Horizontal
+      const hInfo = classifyHorizontalAxis(state.horizontalAngle);
+      dom.horizDiagCard.className = `rounded-xl p-4 border transition-colors ${hInfo.cardCls}`;
+      dom.horizDiagPill.className = `inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider mb-1 ${hInfo.pillCls}`;
+      dom.horizDiagPill.textContent = hInfo.pill;
+      dom.horizDiagTitle.className = `text-lg font-extrabold ${hInfo.titleCls}`;
+      dom.horizDiagTitle.textContent = hInfo.title;
+      dom.horizDiagRange.className = `text-xs font-medium mt-0.5 ${hInfo.rangeCls}`;
+      dom.horizDiagRange.textContent = hInfo.range;
+      dom.horizDiagAngle.textContent = formatDeg(state.horizontalAngle);
+      dom.quickTransitionBadge.textContent = hInfo.shortBadge;
+      dom.horizClinicalNote.textContent = hInfo.note;
+
+      if (hInfo.isV1Dominant) dom.v1DominantAlert.classList.remove('hidden');
+      else dom.v1DominantAlert.classList.add('hidden');
+
+      const mV1 = computeLeadMetrics(HORIZONTAL_LEADS[0]);
+      const mV5 = computeLeadMetrics(HORIZONTAL_LEADS[4]);
+      const mV6 = computeLeadMetrics(HORIZONTAL_LEADS[5]);
+      const sokolowMm = mV1.sMm + Math.max(mV5.rMm, mV6.rMm);
+
+      if (sokolowMm > 35 && mV1.sMm > 8 && Math.max(mV5.rMm, mV6.rMm) > 12) {
+        dom.sokolowAlert.classList.remove('hidden');
+        dom.sokolowText.textContent = `S(V1) [${mV1.sMm.toFixed(1)} mm] + R(V5/V6) [${Math.max(mV5.rMm, mV6.rMm).toFixed(1)} mm] = ${sokolowMm.toFixed(1)} mm (> 35 mm).`;
+      } else {
+        dom.sokolowAlert.classList.add('hidden');
+      }
+
+      const precMetrics = HORIZONTAL_LEADS.map((lead) => ({ lead, m: computeLeadMetrics(lead) }));
+      let minDiff = Infinity;
+      let closestTransitionId = 'V3';
+      precMetrics.forEach(({ lead, m }) => {
+        const diff = Math.abs(m.rMm - m.sMm);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestTransitionId = lead.id;
+        }
+      });
+
+      dom.rProgressionSummary.innerHTML = `
+        Onda R em V1: <strong class="font-mono">${mV1.rMm.toFixed(1)} mm</strong> → V4: <strong class="font-mono">${computeLeadMetrics(HORIZONTAL_LEADS[3]).rMm.toFixed(1)} mm</strong> → V6: <strong class="font-mono">${mV6.rMm.toFixed(1)} mm</strong>.
+        Ponto mais próximo da transição isoelétrica (R ≈ S): <strong class="text-indigo-700">${closestTransitionId}</strong>.
+      `;
+
+      dom.v1V6MiniStrip.innerHTML = precMetrics
+        .map(({ lead, m }) => {
+          const isTrans = lead.id === closestTransitionId;
+          return `
+            <div class="rounded-lg p-1.5 text-center border ${
+              isTrans ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm' : 'bg-white text-slate-700 border-slate-200'
+            }">
+              <span class="block text-[10px] font-extrabold">${lead.name}</span>
+              <span class="block font-mono text-[10px] ${isTrans ? 'text-indigo-100' : 'text-slate-500'}">${m.morphology.split(' ')[0]}</span>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    /**
+     * ============================================================================
+     * RENDERIZAÇÃO DA BIBLIOTECA DE CENÁRIOS NA ABA EXPLORAR
+     * ============================================================================
+     */
+    function renderPresetsBar() {
+      const filtered = CLINICAL_CASES.filter(
+        (c) => state.categoryFilter === 'all' || c.category === state.categoryFilter
+      );
+
+      dom.presetsContainer.innerHTML = filtered
+        .map((c) => {
+          const isActive = c.id === state.activeCaseId;
+          return `
+            <button
+              type="button"
+              data-case-id="${c.id}"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                isActive
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                  : 'bg-slate-50/80 text-slate-800 border-slate-200 hover:bg-slate-100'
+              }"
+            >
+              ${c.label} <span class="font-mono text-[11px] ${isActive ? 'text-indigo-100' : 'text-slate-500'}">(${c.shortMeta})</span>
+            </button>
+          `;
+        })
+        .join('');
+
+      dom.presetsContainer.querySelectorAll('[data-case-id]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          loadCaseInExplore(btn.getAttribute('data-case-id'));
+        });
+      });
+    }
+
+    function loadCaseInExplore(caseId) {
+      const c = CLINICAL_CASES.find((item) => item.id === caseId) || CLINICAL_CASES[0];
+      state.activeCaseId = c.id;
+      state.frontalAngle = c.frontal;
+      state.horizontalAngle = c.horizontal;
+      state.voltageScale = c.voltage;
+      renderPresetsBar();
+      updateAll();
+    }
+
+    /**
+     * ============================================================================
+     * COMPASSO DIGITAL (CALIPERS VIRTUAIS) E MONITOR AO VIVO
+     * ============================================================================
+     */
+    function updateCaliperReadout() {
+      if (!state.caliperActive) return;
+      dom.caliperPin1.style.left = `${state.caliperP1Pct}%`;
+      dom.caliperPin2.style.left = `${state.caliperP2Pct}%`;
+
+      // Largura de referência da Tira de Ritmo DII Longo = 920 SVG units (1 mm = 3.5 SVG units -> 262.8 mm totais)
+      const diffPct = Math.abs(state.caliperP2Pct - state.caliperP1Pct) / 100;
+      const totalMmAt25 = 920 / 3.5; // ~262.85 mm
+      const measuredMm = diffPct * totalMmAt25;
+      const msPerMm = state.paperSpeed === 50 ? 20 : 40;
+      const measuredMs = Math.round(measuredMm * msPerMm);
+      const bpm = measuredMs > 120 ? Math.round(60000 / measuredMs) : '--';
+
+      dom.caliperMm.textContent = `${measuredMm.toFixed(1)} mm`;
+      dom.caliperMs.textContent = `${measuredMs} ms`;
+      dom.caliperBpm.textContent = bpm === '--' ? '-- bpm' : `${bpm} bpm`;
+    }
+
+    function toggleLiveMonitor() {
+      state.liveMonitor = !state.liveMonitor;
+      if (state.liveMonitor) {
+        dom.btnToggleLive.classList.add('border-emerald-500', 'bg-emerald-50', 'text-emerald-900');
+        dom.liveDot.classList.remove('bg-slate-400');
+        dom.liveDot.classList.add('bg-emerald-500', 'animate-ping');
+
+        let lastTime = performance.now();
+        const step = (now) => {
+          if (!state.liveMonitor) return;
+          const dt = (now - lastTime) / 1000;
+          lastTime = now;
+          state.liveSweepPct = (state.liveSweepPct + dt * 22) % 100;
+          renderAll12Leads();
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      } else {
+        dom.btnToggleLive.classList.remove('border-emerald-500', 'bg-emerald-50', 'text-emerald-900');
+        dom.liveDot.classList.remove('bg-emerald-500', 'animate-ping');
+        dom.liveDot.classList.add('bg-slate-400');
+        renderAll12Leads();
+      }
+    }
+
+    /**
+     * ============================================================================
+     * MODO QUIZ PERSONALIZÁVEL (CONFIGURADOR PRÉ-QUIZ + EXECUÇÃO SEM SPOILERS)
+     * ============================================================================
+     */
+    function switchTab(tab) {
+      state.activeTab = tab;
+      if (tab === 'explore') {
+        dom.tabBtnExplore.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-slate-900 shadow-sm';
+        dom.tabBtnQuiz.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900 flex items-center gap-1.5';
+
+        dom.exploreControlsWrapper.classList.remove('hidden');
+        dom.quizView.classList.add('hidden');
+        dom.quizQuestionsSection.classList.add('hidden');
+        dom.ecgPaperSection.classList.remove('hidden');
+        dom.ecgPaperSubtitle.innerHTML = 'Layout clínico em 4 colunas (<span class="font-semibold text-slate-700">DI–DIII | aVR–aVF | V1–V3 | V4–V6</span>) · Papel milimetrado calibrado';
+
+        loadCaseInExplore(state.activeCaseId);
+      } else {
+        dom.tabBtnQuiz.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-white text-indigo-700 shadow-sm flex items-center gap-1.5';
+        dom.tabBtnExplore.className = 'px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all text-slate-600 hover:text-slate-900';
+
+        dom.exploreControlsWrapper.classList.add('hidden');
+        dom.quizView.classList.remove('hidden');
+
+        if (!state.quizStarted) {
+          dom.quizSetupScreen.classList.remove('hidden');
+          dom.quizActiveScreen.classList.add('hidden');
+          dom.ecgPaperSection.classList.add('hidden');
+          dom.quizQuestionsSection.classList.add('hidden');
+          updateQuizSetupCount();
+        } else {
+          dom.quizSetupScreen.classList.add('hidden');
+          dom.quizActiveScreen.classList.remove('hidden');
+          dom.ecgPaperSection.classList.remove('hidden');
+          dom.quizQuestionsSection.classList.remove('hidden');
+          updateAll();
+        }
+      }
+    }
+
+    function getFilteredQuizPool() {
+      return CLINICAL_CASES.filter((c) => {
+        const catOk = state.quizCategories.includes(c.category);
+        const lvlOk = state.quizLevel === 'all' || c.level === state.quizLevel;
+        return catOk && lvlOk;
+      });
+    }
+
+    function updateQuizSetupCount() {
+      const checkedCats = Array.from(document.querySelectorAll('.q-cat-checkbox:checked')).map((el) => el.value);
+      state.quizCategories = checkedCats;
+      state.quizStages = {
+        anamnesis: document.getElementById('chk-stage-anamnesis').checked,
+        diagnosis: document.getElementById('chk-stage-diagnosis').checked,
+        conduct: document.getElementById('chk-stage-conduct').checked,
+      };
+
+      const pool = getFilteredQuizPool();
+      dom.quizPoolCount.textContent = `${pool.length} caso(s) clínico(s) disponível(is) com os filtros atuais`;
+    }
+
+    function startCustomQuiz() {
+      updateQuizSetupCount();
+      const hasStage = state.quizStages.anamnesis || state.quizStages.diagnosis || state.quizStages.conduct;
+      const pool = getFilteredQuizPool();
+
+      if (pool.length === 0 || !hasStage) {
+        dom.quizSetupError.classList.remove('hidden');
+        return;
+      }
+
+      dom.quizSetupError.classList.add('hidden');
+      state.quizStarted = true;
+      state.quizScoreCorrect = 0;
+      state.quizScoreTotal = 0;
+      state.quizCaseNumber = 0;
+      state.quizUsedIds = [];
+
+      dom.quizSetupScreen.classList.add('hidden');
+      dom.quizActiveScreen.classList.remove('hidden');
+      dom.ecgPaperSection.classList.remove('hidden');
+      dom.quizQuestionsSection.classList.remove('hidden');
+      dom.ecgPaperSubtitle.textContent = 'Interprete o traçado eletrocardiográfico em 12 derivações e responda às etapas selecionadas abaixo';
+
+      loadNextQuizQuestion();
+    }
+
+    function loadNextQuizQuestion() {
+      const pool = getFilteredQuizPool();
+      let candidates = pool.filter((c) => !state.quizUsedIds.includes(c.id));
+      if (candidates.length === 0) {
+        state.quizUsedIds = [];
+        candidates = pool;
+      }
+
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+      state.quizUsedIds.push(chosen.id);
+      state.quizCurrentCase = chosen;
+      state.quizCaseNumber += 1;
+      state.quizSubmitted = false;
+      state.quizAnswers = { step1: null, step2: null, step3: null };
+
+      // Aplica os parâmetros do caso no motor do ECG
+      state.frontalAngle = chosen.frontal;
+      state.horizontalAngle = chosen.horizontal;
+      state.voltageScale = chosen.voltage;
+
+      dom.quizQuestionBadge.textContent = `Caso ${state.quizCaseNumber}`;
+      dom.quizScoreDisplay.textContent = `${state.quizScoreCorrect} / ${state.quizScoreTotal}`;
+
+      // Anamnese (Etapa 1)
+      if (state.quizStages.anamnesis) {
+        dom.quizAnamnesisCard.classList.remove('hidden');
+        dom.quizAnamnesisText.textContent = chosen.anamnesis;
+        dom.quizVitalsBar.innerHTML = Object.entries(chosen.vitals)
+          .map(([k, v]) => `<span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700"><strong>${k}:</strong> ${v}</span>`)
+          .join('');
+      } else {
+        dom.quizAnamnesisCard.classList.add('hidden');
+      }
+
+      // Renderiza as etapas de múltipla escolha selecionadas
+      const stagesToRender = [];
+      if (state.quizStages.anamnesis) {
+        stagesToRender.push({ key: 'step1', title: 'Etapa 1 · Leitura Sistemática', data: chosen.qStep1 });
+      }
+      if (state.quizStages.diagnosis) {
+        stagesToRender.push({ key: 'step2', title: 'Etapa 2 · Diagnóstico do ECG', data: chosen.qStep2 });
+      }
+      if (state.quizStages.conduct) {
+        stagesToRender.push({ key: 'step3', title: 'Etapa 3 · Conduta Médica', data: chosen.qStep3 });
+      }
+
+      // Ajusta grid conforme número de etapas marcadas
+      dom.quizStagesContainer.className =
+        stagesToRender.length === 1
+          ? 'grid grid-cols-1 max-w-2xl mx-auto gap-4'
+          : stagesToRender.length === 2
+          ? 'grid grid-cols-1 md:grid-cols-2 gap-4'
+          : 'grid grid-cols-1 lg:grid-cols-3 gap-4';
+
+      dom.quizStagesContainer.innerHTML = stagesToRender
+        .map(
+          (st) => `
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col justify-between space-y-3">
+            <div class="space-y-2">
+              <span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100">
+                ${st.title}
+              </span>
+              <h3 class="text-sm font-bold text-slate-900 leading-snug">
+                ${st.data.prompt}
+              </h3>
+            </div>
+            <div class="space-y-2">
+              ${st.data.options
+                .map(
+                  (opt, idx) => `
+                  <button
+                    type="button"
+                    data-stage-key="${st.key}"
+                    data-opt-idx="${idx}"
+                    class="quiz-opt-btn w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-indigo-50/60 hover:border-indigo-300 text-xs font-medium text-slate-800 transition-all"
+                  >
+                    <span class="font-mono font-bold text-slate-400 mr-1.5">${String.fromCharCode(65 + idx)})</span>
+                    <span>${opt}</span>
+                  </button>
+                `
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+        )
+        .join('');
+
+      dom.quizStagesContainer.querySelectorAll('.quiz-opt-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (state.quizSubmitted) return;
+          const sKey = btn.getAttribute('data-stage-key');
+          const oIdx = parseInt(btn.getAttribute('data-opt-idx'), 10);
+          state.quizAnswers[sKey] = oIdx;
+          refreshQuizOptionStyles();
+        });
+      });
+
+      dom.quizFeedbackBox.classList.add('hidden');
+      dom.btnSubmitQuiz.classList.remove('hidden');
+      dom.btnSubmitQuiz.disabled = true;
+      dom.btnNextQuiz.classList.add('hidden');
+
+      updateAll();
+    }
+
+    function refreshQuizOptionStyles() {
+      dom.quizStagesContainer.querySelectorAll('.quiz-opt-btn').forEach((btn) => {
+        const sKey = btn.getAttribute('data-stage-key');
+        const oIdx = parseInt(btn.getAttribute('data-opt-idx'), 10);
+        const isChosen = state.quizAnswers[sKey] === oIdx;
+        btn.classList.toggle('ring-2', isChosen);
+        btn.classList.toggle('ring-indigo-600', isChosen);
+        btn.classList.toggle('bg-indigo-50', isChosen);
+        btn.classList.toggle('border-indigo-500', isChosen);
+      });
+
+      const reqKeys = [];
+      if (state.quizStages.anamnesis) reqKeys.push('step1');
+      if (state.quizStages.diagnosis) reqKeys.push('step2');
+      if (state.quizStages.conduct) reqKeys.push('step3');
+
+      const allAnswered = reqKeys.every((k) => state.quizAnswers[k] !== null);
+      dom.btnSubmitQuiz.disabled = !allAnswered;
+    }
+
+    function submitQuizAnswers() {
+      if (state.quizSubmitted) return;
+      state.quizSubmitted = true;
+
+      const c = state.quizCurrentCase;
+      const activeSteps = [];
+      if (state.quizStages.anamnesis) activeSteps.push({ key: 'step1', correct: c.qStep1.correct });
+      if (state.quizStages.diagnosis) activeSteps.push({ key: 'step2', correct: c.qStep2.correct });
+      if (state.quizStages.conduct) activeSteps.push({ key: 'step3', correct: c.qStep3.correct });
+
+      let allRight = true;
+      activeSteps.forEach((st) => {
+        if (state.quizAnswers[st.key] !== st.correct) allRight = false;
+      });
+
+      state.quizScoreTotal += 1;
+      if (allRight) state.quizScoreCorrect += 1;
+      dom.quizScoreDisplay.textContent = `${state.quizScoreCorrect} / ${state.quizScoreTotal}`;
+
+      // Destaca gabarito nas alternativas
+      dom.quizStagesContainer.querySelectorAll('.quiz-opt-btn').forEach((btn) => {
+        btn.disabled = true;
+        const sKey = btn.getAttribute('data-stage-key');
+        const oIdx = parseInt(btn.getAttribute('data-opt-idx'), 10);
+        const stepObj = activeSteps.find((s) => s.key === sKey);
+        if (!stepObj) return;
+
+        btn.classList.remove('ring-indigo-600', 'bg-indigo-50', 'border-indigo-500');
+        if (oIdx === stepObj.correct) {
+          btn.classList.add('ring-2', 'ring-emerald-600', 'bg-emerald-50', 'border-emerald-500', 'text-emerald-950');
+        } else if (oIdx === state.quizAnswers[sKey] && oIdx !== stepObj.correct) {
+          btn.classList.add('ring-2', 'ring-rose-500', 'bg-rose-50', 'border-rose-400', 'text-rose-950');
+        } else {
+          btn.classList.add('opacity-55');
+        }
+      });
+
+      dom.quizFeedbackBox.classList.remove('hidden', 'bg-emerald-50', 'border-emerald-200', 'text-emerald-950', 'bg-amber-50', 'border-amber-200', 'text-amber-950');
+      if (allRight) {
+        dom.quizFeedbackBox.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-950');
+      } else {
+        dom.quizFeedbackBox.classList.add('bg-amber-50', 'border-amber-200', 'text-amber-950');
+      }
+
+      dom.quizFeedbackBox.innerHTML = `
+        <p class="font-extrabold mb-1">${allRight ? '✅ Excelente! Todas as etapas corretas.' : '📋 Gabarito Comentado:'} — ${c.label} (${c.wallInfo})</p>
+        <p class="text-xs"><strong>Critérios do ECG:</strong> ${c.ecgCriteria}</p>
+        <p class="text-xs mt-1"><strong>Correlação Clínica:</strong> ${c.clinicalNote}</p>
+      `;
+
+      dom.btnSubmitQuiz.classList.add('hidden');
+      dom.btnNextQuiz.classList.remove('hidden');
+
+      // Revela métricas nos cards de derivação após responder
+      renderAll12Leads();
+    }
+
+    /**
+     * ============================================================================
+     * ATUALIZAÇÃO SINCRONIZADA DE TODA A INTERFACE
+     * ============================================================================
+     */
+    function updateAll() {
+      dom.frontalSlider.value = state.frontalAngle;
+      dom.frontalInput.value = state.frontalAngle;
+      dom.horizontalSlider.value = state.horizontalAngle;
+      dom.horizontalInput.value = state.horizontalAngle;
+      dom.voltageSlider.value = state.voltageScale.toFixed(1);
+      dom.voltageDisplay.textContent = `${state.voltageScale.toFixed(1)}x`;
+
+      const fLead = FRONTAL_LEADS.find((l) => l.id === state.selectedFrontalId) || FRONTAL_LEADS[1];
+      const hLead = HORIZONTAL_LEADS.find((l) => l.id === state.selectedHorizontalId) || HORIZONTAL_LEADS[3];
+      dom.frontalSelectedBadge.textContent = `${fLead.name} (${formatDeg(fLead.posAngle)})`;
+      dom.horizontalSelectedBadge.textContent = `${hLead.name} (${formatDeg(hLead.posAngle)})`;
+
+      if (state.activeTab === 'explore') {
+        renderPlaneCircle({
+          leads: FRONTAL_LEADS,
+          selectedLeadId: state.selectedFrontalId,
+          qrsAngle: state.frontalAngle,
+          leadsContainer: dom.frontalLeads,
+          projectionContainer: dom.frontalProjection,
+          vectorContainer: dom.frontalVector,
+          labelsContainer: dom.frontalLabels,
+          vectorColor: '#dc2626',
+          markerId: 'arrow-frontal',
+          accentColor: '#e11d48',
+          selectCallback: (id) => {
+            state.selectedFrontalId = id;
+            updateAll();
+          },
+        });
+
+        renderPlaneCircle({
+          leads: HORIZONTAL_LEADS,
+          selectedLeadId: state.selectedHorizontalId,
+          qrsAngle: state.horizontalAngle,
+          leadsContainer: dom.horizontalLeads,
+          projectionContainer: dom.horizontalProjection,
+          vectorContainer: dom.horizontalVector,
+          labelsContainer: dom.horizontalLabels,
+          vectorColor: '#2563eb',
+          markerId: 'arrow-horizontal',
+          accentColor: '#2563eb',
+          selectCallback: (id) => {
+            state.selectedHorizontalId = id;
+            updateAll();
+          },
+        });
+
+        updateDiagnosticPanels();
+      }
+
+      renderAll12Leads();
+      updateCaliperReadout();
+    }
+
+    /**
+     * ============================================================================
+     * EVENTOS DE INTERAÇÃO (VETORES, COMPASSO, VELOCIDADE, GANHO, QUIZ)
+     * ============================================================================
+     */
+    function getAngleFromPointer(svgEl, clientX, clientY) {
+      const rect = svgEl.getBoundingClientRect();
+      const x = ((clientX - rect.left) / rect.width) * 500 - CX;
+      const y = ((clientY - rect.top) / rect.height) * 500 - CY;
+      return normalizeAngle((Math.atan2(y, x) * 180) / Math.PI);
+    }
+
+    function bindDragOnSvg(svgEl, planeName) {
+      svgEl.addEventListener('pointerdown', (e) => {
+        if (state.activeTab !== 'explore') return;
+        if (e.target.closest('[data-lead-btn]')) return;
+        state.draggingPlane = planeName;
+        svgEl.setPointerCapture(e.pointerId);
+        const deg = getAngleFromPointer(svgEl, e.clientX, e.clientY);
+        if (planeName === 'frontal') state.frontalAngle = deg;
+        else state.horizontalAngle = deg;
+        updateAll();
+      });
+
+      svgEl.addEventListener('pointermove', (e) => {
+        if (state.draggingPlane !== planeName) return;
+        const deg = getAngleFromPointer(svgEl, e.clientX, e.clientY);
+        if (planeName === 'frontal') state.frontalAngle = deg;
+        else state.horizontalAngle = deg;
+        updateAll();
+      });
+
+      const endDrag = (e) => {
+        if (state.draggingPlane !== planeName) return;
+        state.draggingPlane = null;
+        try {
+          svgEl.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+      };
+
+      svgEl.addEventListener('pointerup', endDrag);
+      svgEl.addEventListener('pointercancel', endDrag);
+    }
+
+    function bindCaliperDrag() {
+      const onMove = (clientX) => {
+        if (!state.draggingPin) return;
+        const rect = dom.ecgCanvasWrapper.getBoundingClientRect();
+        const pct = Math.max(2, Math.min(98, ((clientX - rect.left) / rect.width) * 100));
+        if (state.draggingPin === 'p1') state.caliperP1Pct = pct;
+        else state.caliperP2Pct = pct;
+        updateCaliperReadout();
+      };
+
+      dom.caliperPin1.addEventListener('pointerdown', (e) => {
+        state.draggingPin = 'p1';
+        dom.caliperPin1.setPointerCapture(e.pointerId);
+      });
+      dom.caliperPin2.addEventListener('pointerdown', (e) => {
+        state.draggingPin = 'p2';
+        dom.caliperPin2.setPointerCapture(e.pointerId);
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (state.draggingPin) onMove(e.clientX);
+      });
+      window.addEventListener('pointerup', () => {
+        state.draggingPin = null;
+      });
+    }
+
+    function copyShareLink() {
+      const activeCase = getActiveCase();
+      const summary = `Simulador de ECG (by Pietro Limonge) — Caso: ${activeCase.label} | Frontal: ${formatDeg(state.frontalAngle)} | Horizontal: ${formatDeg(state.horizontalAngle)}`;
+      const tempInput = document.createElement('input');
+      tempInput.value = `${window.location.href.split('#')[0]}#caso=${activeCase.id}&f=${state.frontalAngle}&h=${state.horizontalAngle}`;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Link copiado: ${summary}`);
+      } catch (_) {
+        showToast(summary);
+      }
+      document.body.removeChild(tempInput);
+    }
+
+    function parseUrlHash() {
+      try {
+        const hash = window.location.hash.replace('#', '');
+        if (!hash) return;
+        const params = new URLSearchParams(hash);
+        const caso = params.get('caso');
+        if (caso && CLINICAL_CASES.some((c) => c.id === caso)) {
+          loadCaseInExplore(caso);
+        }
+        if (params.has('f')) state.frontalAngle = normalizeAngle(parseInt(params.get('f'), 10) || 50);
+        if (params.has('h')) state.horizontalAngle = normalizeAngle(parseInt(params.get('h'), 10) || -20);
+      } catch (_) {}
+    }
+
+    function bindEvents() {
+      // Abas principais
+      dom.tabBtnExplore.addEventListener('click', () => switchTab('explore'));
+      dom.tabBtnQuiz.addEventListener('click', () => switchTab('quiz'));
+
+      // Filtro de categorias da biblioteca clínica
+      document.querySelectorAll('.cat-pill').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.categoryFilter = btn.getAttribute('data-cat-filter');
+          document.querySelectorAll('.cat-pill').forEach((p) => {
+            const active = p.getAttribute('data-cat-filter') === state.categoryFilter;
+            p.className = active
+              ? 'cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-white'
+              : 'cat-pill px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200';
+          });
+          renderPresetsBar();
+        });
+      });
+
+      document.getElementById('btn-share-case').addEventListener('click', copyShareLink);
+
+      // Arraste nos dois círculos SVG
+      bindDragOnSvg(dom.frontalSvg, 'frontal');
+      bindDragOnSvg(dom.horizontalSvg, 'horizontal');
+
+      // Controles Plano Frontal
+      dom.frontalSlider.addEventListener('input', (e) => {
+        state.frontalAngle = normalizeAngle(parseInt(e.target.value, 10));
+        updateAll();
+      });
+      dom.frontalInput.addEventListener('change', (e) => {
+        let v = parseInt(e.target.value, 10);
+        if (Number.isNaN(v)) v = state.frontalAngle;
+        state.frontalAngle = normalizeAngle(Math.max(-180, Math.min(180, v)));
+        updateAll();
+      });
+      document.getElementById('btn-frontal-dec').addEventListener('click', () => {
+        state.frontalAngle = normalizeAngle(state.frontalAngle - 1);
+        updateAll();
+      });
+      document.getElementById('btn-frontal-inc').addEventListener('click', () => {
+        state.frontalAngle = normalizeAngle(state.frontalAngle + 1);
+        updateAll();
+      });
+
+      // Controles Plano Horizontal
+      dom.horizontalSlider.addEventListener('input', (e) => {
+        state.horizontalAngle = normalizeAngle(parseInt(e.target.value, 10));
+        updateAll();
+      });
+      dom.horizontalInput.addEventListener('change', (e) => {
+        let v = parseInt(e.target.value, 10);
+        if (Number.isNaN(v)) v = state.horizontalAngle;
+        state.horizontalAngle = normalizeAngle(Math.max(-180, Math.min(180, v)));
+        updateAll();
+      });
+      document.getElementById('btn-horiz-dec').addEventListener('click', () => {
+        state.horizontalAngle = normalizeAngle(state.horizontalAngle - 1);
+        updateAll();
+      });
+      document.getElementById('btn-horiz-inc').addEventListener('click', () => {
+        state.horizontalAngle = normalizeAngle(state.horizontalAngle + 1);
+        updateAll();
+      });
+
+      // Voltagem QRS
+      dom.voltageSlider.addEventListener('input', (e) => {
+        state.voltageScale = parseFloat(e.target.value);
+        updateAll();
+      });
+
+      // Compasso Digital
+      dom.btnToggleCaliper.addEventListener('click', () => {
+        state.caliperActive = !state.caliperActive;
+        dom.caliperOverlay.classList.toggle('hidden', !state.caliperActive);
+        dom.caliperBtnLabel.textContent = state.caliperActive ? 'Compasso Digital: On' : 'Compasso Digital: Off';
+        dom.btnToggleCaliper.classList.toggle('border-indigo-500', state.caliperActive);
+        dom.btnToggleCaliper.classList.toggle('bg-indigo-50', state.caliperActive);
+        dom.btnToggleCaliper.classList.toggle('text-indigo-900', state.caliperActive);
+        updateCaliperReadout();
+      });
+      bindCaliperDrag();
+
+      // Velocidade e Ganho
+      document.querySelectorAll('.speed-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.paperSpeed = parseInt(btn.getAttribute('data-speed'), 10);
+          document.querySelectorAll('.speed-btn').forEach((b) => {
+            const active = parseInt(b.getAttribute('data-speed'), 10) === state.paperSpeed;
+            b.className = active
+              ? 'speed-btn px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-slate-900 shadow-xs'
+              : 'speed-btn px-2.5 py-1 rounded-lg font-mono font-semibold text-slate-600 hover:text-slate-900';
+          });
+          updateAll();
+        });
+      });
+
+      document.querySelectorAll('.gain-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.paperGain = parseFloat(btn.getAttribute('data-gain'));
+          document.querySelectorAll('.gain-btn').forEach((b) => {
+            const active = parseFloat(b.getAttribute('data-gain')) === state.paperGain;
+            b.className = active
+              ? 'gain-btn px-2.5 py-1 rounded-lg font-mono font-bold bg-white text-slate-900 shadow-xs'
+              : 'gain-btn px-2 py-1 rounded-lg font-mono font-semibold text-slate-600 hover:text-slate-900';
+          });
+          updateAll();
+        });
+      });
+
+      // Monitor ao Vivo
+      dom.btnToggleLive.addEventListener('click', toggleLiveMonitor);
+
+      // Configuração do Quiz
+      document.querySelectorAll('.q-level-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.quizLevel = btn.getAttribute('data-level');
+          document.querySelectorAll('.q-level-btn').forEach((b) => {
+            const active = b.getAttribute('data-level') === state.quizLevel;
+            b.className = active
+              ? 'q-level-btn px-3.5 py-2.5 rounded-xl border-2 border-indigo-600 bg-indigo-50 text-indigo-950 text-xs font-bold text-left transition-all'
+              : 'q-level-btn px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-800 text-xs font-bold text-left transition-all';
+          });
+          updateQuizSetupCount();
+        });
+      });
+
+      document.querySelectorAll('.q-cat-checkbox, .q-stage-checkbox').forEach((chk) => {
+        chk.addEventListener('change', updateQuizSetupCount);
+      });
+
+      document.getElementById('btn-toggle-all-cats').addEventListener('click', () => {
+        const boxes = Array.from(document.querySelectorAll('.q-cat-checkbox'));
+        const allChecked = boxes.every((b) => b.checked);
+        boxes.forEach((b) => (b.checked = !allChecked));
+        updateQuizSetupCount();
+      });
+
+      document.getElementById('btn-start-quiz').addEventListener('click', startCustomQuiz);
+      document.getElementById('btn-reconfigure-quiz').addEventListener('click', () => {
+        state.quizStarted = false;
+        switchTab('quiz');
+      });
+
+      dom.btnSubmitQuiz.addEventListener('click', submitQuizAnswers);
+      dom.btnNextQuiz.addEventListener('click', loadNextQuizQuestion);
+    }
+
+    // Inicialização
+    initStaticCircles();
+    renderPresetsBar();
+    bindEvents();
+    parseUrlHash();
+    updateAll();
+  </script>
+</body>
+</html>
